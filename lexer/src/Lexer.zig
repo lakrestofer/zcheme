@@ -6,14 +6,29 @@ const test_prod = @import("./testing.zig").test_prod;
 // struct Lexer {
 input: []const u8,
 pos: usize,
+end_reached: bool = false,
 //}
 
 pub const TokenKind = enum {
-    EOF,
-    INVALID,
-    WHITESPACE,
-    L_PAREN,
-    R_PAREN,
+    EOF, // \xOO
+    INVALID, // some invalid token
+    WHITESPACE, // ' \n\r\t' and whatever char isWhitespace deems to be a whitespace
+    L_PAREN, // (
+    R_PAREN, // )
+    L_SQUARE_PAREN, // [
+    R_SQUARE_PAREN, // ]
+    // L_CURLY_PAREN, // { reserved for future use, .INVALID for now
+    // R_CURLY_PAREN, // } reserved for future use, .INVALID for now
+    L_VEC_PAREN, // #(
+    L_BYTE_VEC_PAREN, // #vu8(
+    QUOTE, // '
+    QUASI_QUOTE, // `
+    UNQUOTE, // ,
+    UNQUOTE_SPLICING, // ,@
+    SYNTAX, // #'
+    QUASI_SYNTAX, // #`
+    UNSYNTAX, // #'
+    UNSYNTAX_SPLICING, // #'@
 };
 
 pub const Token = struct {
@@ -39,20 +54,39 @@ pub fn init(input: []const u8) Self {
     };
 }
 
-pub fn nextToken(self: *Self) Token {
+pub fn nextToken(self: *Self) ?Token {
+    if (self.end_reached) return null;
+    if (self.input.len <= self.pos) {
+        self.end_reached = true;
+        return Token.new(.EOF, self.pos, self.pos);
+    }
+
+    // std.debug.print("current pos: {}\n", .{self.pos});
+
     const start = self.pos;
-    var end = self.pos;
-    var kind: TokenKind = .INVALID;
+    if (whitespace(self.input, &self.pos)) return Token.new(.WHITESPACE, start, self.pos);
+    if (l_byte_vec_paren(self.input, &self.pos)) return Token.new(.L_BYTE_VEC_PAREN, start, self.pos);
+    if (l_vec_paren(self.input, &self.pos)) return Token.new(.L_VEC_PAREN, start, self.pos);
+    if (l_paren(self.input, &self.pos)) return Token.new(.L_PAREN, start, self.pos);
+    if (r_paren(self.input, &self.pos)) return Token.new(.R_PAREN, start, self.pos);
+    if (l_square_paren(self.input, &self.pos)) return Token.new(.L_SQUARE_PAREN, start, self.pos);
+    if (r_square_paren(self.input, &self.pos)) return Token.new(.R_SQUARE_PAREN, start, self.pos);
+    if (l_curly_paren(self.input, &self.pos)) return Token.new(.INVALID, start, self.pos);
+    if (r_curly_paren(self.input, &self.pos)) return Token.new(.INVALID, start, self.pos);
+    if (quote(self.input, &self.pos)) return Token.new(.QUOTE, start, self.pos);
+    if (quasi_quote(self.input, &self.pos)) return Token.new(.QUASI_QUOTE, start, self.pos);
+    if (unquote(self.input, &self.pos)) return Token.new(.UNQUOTE, start, self.pos);
+    if (unquote_splicing(self.input, &self.pos)) return Token.new(.UNQUOTE_SPLICING, start, self.pos);
+    if (syntax(self.input, &self.pos)) return Token.new(.SYNTAX, start, self.pos);
+    if (quasi_syntax(self.input, &self.pos)) return Token.new(.QUASI_SYNTAX, start, self.pos);
+    if (unsyntax(self.input, &self.pos)) return Token.new(.UNSYNTAX, start, self.pos);
+    if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
 
-    if (self.input.len <= end) return Token.new(.EOF, start, end);
+    // if we found not invalid pos we increment pos by one,
+    // such that we still progress somehow
+    self.pos += 1;
 
-    if (whitespace(self.input, &end)) kind = .WHITESPACE;
-    if (l_paren(self.input, &end)) kind = .L_PAREN;
-    if (r_paren(self.input, &end)) kind = .R_PAREN;
-
-    self.pos = end;
-
-    return Token.new(kind, start, end);
+    return Token.new(.INVALID, start, self.pos);
 }
 
 // === production rules begin ===
@@ -131,45 +165,45 @@ test r_paren {
     try test_prod(r_paren, ")", 1);
 }
 test l_square_paren {
-    try test_prod(l_square_paren, "[", 1);
+    try test_prod(l_square_paren, "[  ", 1);
 }
 test r_square_paren {
-    try test_prod(r_square_paren, "]", 1);
+    try test_prod(r_square_paren, "]  ", 1);
 }
 test l_curly_paren {
-    try test_prod(l_curly_paren, "{", 1);
+    try test_prod(l_curly_paren, "{  ", 1);
 }
 test r_curly_paren {
-    try test_prod(r_curly_paren, "}", 1);
+    try test_prod(r_curly_paren, "}  ", 1);
 }
 test l_vec_paren {
-    try test_prod(l_vec_paren, "#(", 2);
+    try test_prod(l_vec_paren, "#(   ", 2);
 }
 test l_byte_vec_paren {
-    try test_prod(l_byte_vec_paren, "#vu8(", 5);
+    try test_prod(l_byte_vec_paren, "#vu8(  ", 5);
 }
 
 test quote {
-    try test_prod(quote, "'", 1);
+    try test_prod(quote, "'  ", 1);
 }
 test quasi_quote {
-    try test_prod(quasi_quote, "`", 1);
+    try test_prod(quasi_quote, "`  ", 1);
 }
 test unquote {
-    try test_prod(unquote, ",", 1);
+    try test_prod(unquote, ",  ", 1);
 }
 test unquote_splicing {
-    try test_prod(unquote_splicing, ",@", 2);
+    try test_prod(unquote_splicing, ",@  ", 2);
 }
 test syntax {
-    try test_prod(syntax, "#'", 2);
+    try test_prod(syntax, "#'  ", 2);
 }
 test quasi_syntax {
-    try test_prod(quasi_syntax, "#`", 2);
+    try test_prod(quasi_syntax, "#`  ", 2);
 }
 test unsyntax {
-    try test_prod(unsyntax, "#,", 2);
+    try test_prod(unsyntax, "#,  ", 2);
 }
 test unsyntax_splicing {
-    try test_prod(unsyntax_splicing, "#,@", 3);
+    try test_prod(unsyntax_splicing, "#,@   ", 3);
 }

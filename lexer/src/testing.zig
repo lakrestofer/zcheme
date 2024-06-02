@@ -1,4 +1,5 @@
 const std = @import("std");
+const test_allocator = std.testing.allocator;
 const Lexer = @import("./Lexer.zig");
 const Token = Lexer.Token;
 
@@ -16,7 +17,35 @@ pub fn test_prod(
 
 pub fn test_lexer(input: []const u8, expected: []const Token) !void {
     var lexer = Lexer.init(input);
-    for (expected) |token| {
-        try std.testing.expectEqual(token, lexer.nextToken());
-    }
+    var tokens = std.ArrayList(Token).init(test_allocator);
+    defer tokens.deinit();
+
+    while (lexer.nextToken()) |token| try tokens.append(token);
+    // for (tokens.items) |token| {
+    //     std.debug.print("token: {any}\n", .{token.kind});
+    // }
+    try std.testing.expectEqualSlices(Token, expected, tokens.items);
+}
+
+test "(\n(\t)  )" {
+    try test_lexer("(\n(\t)  )", &([_]Token{
+        Token.new(.L_PAREN, 0, 1),
+        Token.new(.WHITESPACE, 1, 2),
+        Token.new(.L_PAREN, 2, 3),
+        Token.new(.WHITESPACE, 3, 4),
+        Token.new(.R_PAREN, 4, 5),
+        Token.new(.WHITESPACE, 5, 7),
+        Token.new(.R_PAREN, 7, 8),
+        Token.new(.EOF, 8, 8),
+    }));
+}
+
+test "#(())" {
+    try test_lexer("#(())", &([_]Token{
+        Token.new(.L_VEC_PAREN, 0, 2),
+        Token.new(.L_PAREN, 2, 3),
+        Token.new(.R_PAREN, 3, 4),
+        Token.new(.R_PAREN, 4, 5),
+        Token.new(.EOF, 5, 5),
+    }));
 }
