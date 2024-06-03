@@ -49,3 +49,21 @@ test "#(())" {
         Token.new(.EOF, 5, 5),
     }));
 }
+
+test "multiline with comments" {
+    const input =
+        \\; this is a comment with a newline
+        \\'() ; here is another with a manual newline \r\n
+        \\;and a comment
+    ;
+    try test_lexer(input, &([_]Token{
+        Token.new(.COMMMENT, 0, 35),
+        Token.new(.QUOTE, 35, 36),
+        Token.new(.L_PAREN, 36, 37),
+        Token.new(.R_PAREN, 37, 38),
+        Token.new(.WHITESPACE, 38, 39),
+        Token.new(.COMMMENT, 39, 84),
+        Token.new(.COMMMENT, 84, 98),
+        Token.new(.EOF, 98, 98),
+    }));
+}

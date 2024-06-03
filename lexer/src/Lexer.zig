@@ -83,6 +83,7 @@ pub fn nextToken(self: *Self) ?Token {
     if (quasi_syntax(self.input, &self.pos)) return Token.new(.QUASI_SYNTAX, start, self.pos);
     if (unsyntax(self.input, &self.pos)) return Token.new(.UNSYNTAX, start, self.pos);
     if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
+    if (comment(self.input, &self.pos)) return Token.new(.COMMMENT, start, self.pos);
 
     // if we found not invalid pos we increment pos by one,
     // such that we still progress somehow
