@@ -216,6 +216,58 @@ fn nested_comment(input: []const u8, pos: *usize) bool {
     pos.* = p;
     return true;
 }
+
+TODO add testcase
+fn atmosphere(input: []const u8, pos: *usize) bool {
+    return whitespace(input, pos) or comment(input, pos);
+}
+
+TODO add testcase
+fn intertoken_space(input: []const u8, pos: *usize) bool {
+    if (!atmosphere(input, pos)) return false;
+    while (atmosphere(input, pos)) {}
+    return true;
+}
+
+TODO add testcase
+fn identifier(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    if (!initial(input, &p)) return false;
+
+    pos.* = p;
+    return true;
+}
+
+TODO add testcase
+fn initial(input: []const u8, pos: *usize) bool {
+    return constituent(input, pos) or
+        special_initial(input, pos);
+    // inline_hex_escape(input, pos);
+}
+
+TODO add testcase
+fn constituent(input: []const u8, pos: *usize) bool {
+    return letter(input, pos);
+}
+
+TODO add testcase
+fn letter(input: []const u8, pos: *usize) bool {
+    if (!std.ascii.isAlphabetic(input[pos.*])) return false;
+    pos.* += 1;
+}
+
+TODO add testcase
+fn special_initial(input: []const u8, pos: *usize) bool {
+    const special = "!$%&*/:<=>?^_~";
+    for (special) |c| {
+        if (input[pos] == c) {
+            pos.* += 1;
+            return true;
+        }
+    }
+    return false;
+}
+
 // === production rules end===
 
 // utils
