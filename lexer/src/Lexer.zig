@@ -29,6 +29,8 @@ pub const TokenKind = enum {
     QUASI_SYNTAX, // #`
     UNSYNTAX, // #'
     UNSYNTAX_SPLICING, // #'@
+    COMMMENT,
+    IDENTIFIER,
 };
 
 pub const Token = struct {
@@ -144,6 +146,34 @@ fn unsyntax(input: []const u8, pos: *usize) bool {
 fn unsyntax_splicing(input: []const u8, pos: *usize) bool {
     return terminal_string("#,@", input, pos);
 }
+
+fn line_ending(input: []const u8, pos: *usize) bool {
+    const rest = input[pos.*..];
+    if (rest.len >= 2 and std.mem.eql(u8, rest[0..2], "\r\n")) {
+        pos.* += 2;
+        return true;
+    }
+    if (input[pos.*] == '\r' or input[pos.*] == '\n') {
+        pos.* += 1;
+        return true;
+    }
+    return false;
+}
+
+fn comment(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    // ;
+    if (input[p] != ';') return false;
+    p += 1;
+    // anything except line_ending and eof
+    while (p < input.len and input[p] != '\r' and input[p] != '\n')
+        p += 1;
+    if (p >= input.len or line_ending(input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    return false;
+}
 // === production rules end===
 
 // utils
@@ -206,4 +236,16 @@ test unsyntax {
 }
 test unsyntax_splicing {
     try test_prod(unsyntax_splicing, "#,@   ", 3);
+}
+test line_ending {
+    try test_prod(line_ending, "\r\n", 2);
+    try test_prod(line_ending, "\r", 1);
+    try test_prod(line_ending, "\n", 1);
+}
+
+test comment {
+    try test_prod(comment, ";\r\n", 3);
+    try test_prod(comment, ";\n", 2);
+    try test_prod(comment, ";\n", 2);
+    try test_prod(comment, ";", 1);
 }
