@@ -161,6 +161,16 @@ fn unsyntax_splicing(input: []const u8, pos: *usize) bool {
     return terminal_string("#,@", input, pos);
 }
 
+fn dubble_quote(input: []const u8, pos: *usize) bool {
+    return terminal_string("\"", input, pos);
+}
+fn semicolon(input: []const u8, pos: *usize) bool {
+    return terminal_string(";", input, pos);
+}
+fn hashtag(input: []const u8, pos: *usize) bool {
+    return terminal_string("#", input, pos);
+}
+
 fn line_ending(input: []const u8, pos: *usize) bool {
     const rest = input[pos.*..];
     if (rest.len >= 2 and std.mem.eql(u8, rest[0..2], "\r\n")) {
@@ -244,23 +254,90 @@ fn intertoken_space(input: []const u8, pos: *usize) bool {
 
 fn identifier(input: []const u8, pos: *usize) bool {
     // either initial subsequent*
-    if (initial(input, pos)) {
-        while (pos.* < input.len and subsequent(input, pos)) {}
+    var p = pos.*;
+
+    if (initial(input, &p)) {
+        while (p < input.len and subsequent(input, &p)) {}
+
+        if (!delimiter_termination(input, p)) return false;
+
+        pos.* = p;
         return true;
     }
+    if (!peculiar_identifier(input, &p)) return false;
+    if (!delimiter_termination(input, p)) return false;
+    pos.* = p;
     // or peculiar identifier
-    return peculiar_identifier(input, pos);
+    return true;
 }
 
 fn boolean(input: []const u8, pos: *usize) bool {
-    if (input[pos.*..].len < 2) return false;
-    if (input[pos.*] != '#') return false;
-    for ("tTfF") |c| if (input[pos.* + 1] == c) {
-        pos.* += 2;
-        return true;
-    };
-    return false;
+    return terminal_string("#t", input, pos) or
+        terminal_string("#T", input, pos) or
+        terminal_string("#f", input, pos) or
+        terminal_string("#F", input, pos);
 }
+
+const CHARACTER_NAMES: [12][]const u8 = .{
+    "nul", "alarm", "backspace", "tab", "linefeed", "newline", "vtab", "page", "return", "esc", "space", "delete",
+};
+
+fn character(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    // p_diff = 0
+    // #\
+    if (!terminal_string("#\\", input, &p)) return false;
+    // p_diff = 2
+
+    // #\character_name
+    // if (terminal_string("nul", input, &p)) ...
+    // if (terminal_string("alarm", input, &p)) ...
+    inline for (CHARACTER_NAMES) |name| {
+        if (terminal_string(name, input, &p)) {
+            pos.* = p;
+            return true;
+        }
+    }
+    // #\x
+    p += 1;
+    if (input[p - 1] == 'x') {
+        if (input[p..].len > 0 and hex_scalar_value(input, &p)) {
+            pos.* = p;
+            return true;
+        }
+    }
+
+    // the last case (#\{any_char}) becomes implicit
+    // since p already points after 'any_char'
+    // below
+
+    if (!delimiter_termination(input, p)) return false;
+
+    pos.* = p;
+    return true;
+}
+
+// identifiers, characters, numbers and strings need to be terminated
+// by some delimiter or eof
+// does not advance pos (taken by copy and not reference)
+fn delimiter_termination(input: []const u8, pos: usize) bool {
+    var p = pos;
+    return eof(input, &p) or
+        delimiter(input, &p);
+}
+
+// NOTE: only checks for the delimiter
+fn delimiter(input: []const u8, pos: *usize) bool {
+    return l_paren(input, pos) or
+        r_paren(input, pos) or
+        l_square_paren(input, pos) or
+        r_square_paren(input, pos) or
+        dubble_quote(input, pos) or
+        semicolon(input, pos) or
+        hashtag(input, pos) or
+        whitespace(input, pos);
+}
+
 fn initial(input: []const u8, pos: *usize) bool {
     return constituent(input, pos) or
         special_initial(input, pos) or
@@ -499,4 +576,21 @@ test boolean {
     try test_prod(boolean, "#T", 2);
     try test_prod(boolean, "#f", 2);
     try test_prod(boolean, "#F", 2);
+}
+
+test character {
+    // match all named characters
+    inline for (CHARACTER_NAMES) |name| {
+        try test_prod(character, "#\\" ++ name, name.len + 2);
+    }
+    // match characters using hex notation
+    try test_prod(character, "#\\x0123456789abcdefABCDEF", 25); // TRIVIA: utf8 got NOTHING against this bad boy
+    // match single char characters
+    try test_prod(character, "#\\x", 3);
+    try test_prod(character, "#\\;", 3);
+    try test_prod(character, "#\\,", 3);
+    try test_prod(character, "#\\;", 3);
+    try test_prod(character, "#\\,", 3);
+    try test_prod(character, "#\\'", 3);
+    try test_prod(character, "#\\a", 3);
 }
