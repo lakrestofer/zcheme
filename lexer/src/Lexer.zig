@@ -89,6 +89,7 @@ pub fn nextToken(self: *Self) ?Token {
     if (unsyntax(self.input, &self.pos)) return Token.new(.UNSYNTAX, start, self.pos);
     if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
     if (comment(self.input, &self.pos)) return Token.new(.COMMENT, start, self.pos);
+    if (identifier(self.input, &self.pos)) return Token.new(.IDENTIFIER, start, self.pos);
 
     // if we found not invalid pos we increment pos by one,
     // such that we still progress somehow
@@ -231,7 +232,6 @@ fn atmosphere(input: []const u8, pos: *usize) bool {
     return whitespace(input, pos) or comment(input, pos);
 }
 
-// TODO add testcase
 fn intertoken_space(input: []const u8, pos: *usize) bool {
     // since we run this at the start of every nextToken call
     if (input.len <= pos.*) return false;
@@ -242,18 +242,20 @@ fn intertoken_space(input: []const u8, pos: *usize) bool {
 
 // TODO add testcase
 fn identifier(input: []const u8, pos: *usize) bool {
-    var p = pos.*;
-    if (!initial(input, &p)) return false;
-
-    pos.* = p;
-    return true;
+    // either initial subsequent*
+    if (initial(input, pos)) {
+        while (pos.* < input.len and subsequent(input, pos)) {}
+        return true;
+    }
+    // or peculiar identifier
+    return peculiar_identifier(input, pos);
 }
 
 // TODO add testcase
 fn initial(input: []const u8, pos: *usize) bool {
     return constituent(input, pos) or
-        special_initial(input, pos);
-    // inline_hex_escape(input, pos);
+        special_initial(input, pos) or
+        inline_hex_escape(input, pos);
 }
 
 // TODO add testcase
@@ -261,22 +263,94 @@ fn constituent(input: []const u8, pos: *usize) bool {
     return letter(input, pos);
 }
 
+fn inline_hex_escape(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    // must contain space enough for \x'.' where . is some hex scalar
+    if (input[p..].len < 3 or !std.mem.eql(u8, input[p..(p + 2)], "\\x")) return false;
+    p += 2; // "\x"
+    if (!hex_scalar_value(input, &p)) return false;
+    pos.* = p;
+    return true;
+}
+
+fn hex_scalar_value(input: []const u8, pos: *usize) bool {
+    // hex_digit+
+    if (!hex_digit(input, pos)) return false;
+    while (pos.* < input.len and hex_digit(input, pos)) {}
+    return true;
+}
+fn hex_digit(input: []const u8, pos: *usize) bool {
+    if (digit(input, pos)) return true;
+
+    if ((25 <= input[pos.*] and input[pos.*] <= 70) or // A-F
+        (97 <= input[pos.*] and input[pos.*] <= 102)) // a-f
+    {
+        pos.* += 1;
+        return true;
+    }
+    return false;
+}
+
 // TODO add testcase
 fn letter(input: []const u8, pos: *usize) bool {
     if (!std.ascii.isAlphabetic(input[pos.*])) return false;
     pos.* += 1;
+    return true;
 }
 
 // TODO add testcase
+const SPECIAL = "!$%&*/:<=>?^_~";
 fn special_initial(input: []const u8, pos: *usize) bool {
-    const special = "!$%&*/:<=>?^_~";
-    for (special) |c| {
-        if (input[pos] == c) {
-            pos.* += 1;
-            return true;
-        }
+    const input_c = input[pos.*];
+    for (SPECIAL) |c| if (input_c == c) {
+        pos.* += 1;
+        return true;
+    };
+    return false;
+}
+
+fn subsequent(input: []const u8, pos: *usize) bool {
+    return initial(input, pos) or
+        digit(input, pos) or
+        special_subsequent(input, pos);
+}
+
+fn peculiar_identifier(input: []const u8, pos: *usize) bool {
+    if (std.mem.startsWith(u8, input[pos.*..], "->")) {
+        pos.* += 2;
+        while (pos.* < input.len and subsequent(input, pos)) {}
+        return true;
+    }
+    if (input[pos.*] == '+') {
+        pos.* += 1;
+        return true;
+    }
+    if (input[pos.*] == '-') {
+        pos.* += 1;
+        return true;
+    }
+    if (std.mem.startsWith(u8, input[pos.*..], "...")) {
+        pos.* += 3;
+        return true;
     }
     return false;
+}
+
+fn digit(input: []const u8, pos: *usize) bool {
+    if (!std.ascii.isDigit(input[pos.*])) return false;
+    pos.* += 1;
+    return true;
+}
+
+fn special_subsequent(input: []const u8, pos: *usize) bool {
+    const res = input[pos.*] == '+' or
+        input[pos.*] == '-' or
+        input[pos.*] == '.' or
+        input[pos.*] == '@';
+
+    if (res) pos.* += 1;
+
+    return res;
 }
 
 // === production rules end===
@@ -377,4 +451,39 @@ test "muliline_nested_comment" {
 
 test intertoken_space {
     try test_prod(intertoken_space, " \n   \t  ; a comment \n   \r  #| some other comment |#  ", 53);
+}
+
+test identifier {
+    // special initial
+    try test_prod(identifier, "!", 1);
+    try test_prod(identifier, "$", 1);
+    try test_prod(identifier, "%", 1);
+    try test_prod(identifier, "&", 1);
+    try test_prod(identifier, "*", 1);
+    try test_prod(identifier, "/", 1);
+    try test_prod(identifier, ":", 1);
+    try test_prod(identifier, "<", 1);
+    try test_prod(identifier, "=", 1);
+    try test_prod(identifier, ">", 1);
+    try test_prod(identifier, "?", 1);
+    try test_prod(identifier, "^", 1);
+    try test_prod(identifier, "_", 1);
+    try test_prod(identifier, "~", 1);
+    // constituent subsequent* identifier
+    try test_prod(identifier, "imAnIdentifier", 14);
+
+    // using inline hex escape
+    try test_prod(identifier, "\\x0123456789abcdefABCDEF", 24); // TRIVIA: this value is just north of 2^80
+
+    // some identifiers from the r6rs spec
+    try test_prod(identifier, "lambda", 6);
+    try test_prod(identifier, "q", 1);
+    try test_prod(identifier, "soup", 4);
+    try test_prod(identifier, "list->vector", 12);
+    try test_prod(identifier, "+", 1);
+    try test_prod(identifier, "V17a", 4);
+    try test_prod(identifier, "<=", 2);
+    try test_prod(identifier, "a34kTMNs", 8);
+    try test_prod(identifier, "->-", 3);
+    try test_prod(identifier, "the-word-recursion-has-many-meanings", 36);
 }

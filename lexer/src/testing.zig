@@ -15,8 +15,8 @@ pub fn test_prod(
     try std.testing.expectEqual(expected_end, pos);
 }
 
-pub fn test_lexer(input: []const u8, expected: []const Token) !void {
-    var lexer = Lexer.init(input, .{});
+pub fn test_lexer(input: []const u8, expected: []const Token, options: Lexer.LexerOptions) !void {
+    var lexer = Lexer.init(input, options);
     var tokens = std.ArrayList(Token).init(test_allocator);
     defer tokens.deinit();
 
@@ -27,13 +27,10 @@ pub fn test_lexer(input: []const u8, expected: []const Token) !void {
 test "(\n(\t)  )" {
     try test_lexer("(\n(\t)  )", &([_]Token{
         Token.new(.L_PAREN, 0, 1),
-        Token.new(.WHITESPACE, 1, 2),
         Token.new(.L_PAREN, 2, 3),
-        Token.new(.WHITESPACE, 3, 4),
         Token.new(.R_PAREN, 4, 5),
-        Token.new(.WHITESPACE, 5, 7),
         Token.new(.R_PAREN, 7, 8),
-    }));
+    }), .{ .filter_atmosphere = true });
 }
 
 test "#(())" {
@@ -42,7 +39,7 @@ test "#(())" {
         Token.new(.L_PAREN, 2, 3),
         Token.new(.R_PAREN, 3, 4),
         Token.new(.R_PAREN, 4, 5),
-    }));
+    }), .{ .filter_atmosphere = true });
 }
 
 test "multiline with comments" {
@@ -59,5 +56,5 @@ test "multiline with comments" {
         Token.new(.WHITESPACE, 38, 39),
         Token.new(.COMMENT, 39, 84),
         Token.new(.COMMENT, 84, 98),
-    }));
+    }), .{});
 }
