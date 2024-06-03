@@ -162,6 +162,14 @@ fn line_ending(input: []const u8, pos: *usize) bool {
 }
 
 fn comment(input: []const u8, pos: *usize) bool {
+    return single_line_comment(input, pos) or
+        nested_comment(input, pos);
+    // nested_comment(input, pos) or
+    // datum_comment(input, pos) or
+    // extension_comment(input, pos);
+}
+
+fn single_line_comment(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // ;
     if (input[p] != ';') return false;
@@ -174,6 +182,39 @@ fn comment(input: []const u8, pos: *usize) bool {
         return true;
     }
     return false;
+}
+fn nested_comment(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+
+    if (!terminal_string("#|", input, &p)) return false; // p += 1
+
+    // comment text
+    while (p < input.len - 1 and
+        !(std.mem.eql(u8, input[p..(p + 2)], "#|") or
+        std.mem.eql(u8, input[p..(p + 2)], "|#")))
+    {
+        p += 1;
+    }
+    // we've found something that was either "#|",
+    // "|#" or we reached end of input
+
+    // // nested comment
+    _ = nested_comment(input, &p);
+
+    // // comment_text
+    while (p < input.len - 1 and
+        !(std.mem.eql(u8, input[p..(p + 2)], "#|") or
+        std.mem.eql(u8, input[p..(p + 2)], "|#")))
+    {
+        p += 1;
+    }
+
+    if (!terminal_string("|#", input, &p)) return false;
+
+    // having successfully parsed the comment
+    // we update the cursor position of the caller
+    pos.* = p;
+    return true;
 }
 // === production rules end===
 
@@ -244,9 +285,16 @@ test line_ending {
     try test_prod(line_ending, "\n", 1);
 }
 
-test comment {
-    try test_prod(comment, ";\r\n", 3);
-    try test_prod(comment, ";\n", 2);
-    try test_prod(comment, ";\n", 2);
-    try test_prod(comment, ";", 1);
+test single_line_comment {
+    try test_prod(single_line_comment, ";\r\n", 3);
+    try test_prod(single_line_comment, ";\n", 2);
+    try test_prod(single_line_comment, ";\n", 2);
+    try test_prod(single_line_comment, ";", 1);
+}
+
+test nested_comment {
+    try test_prod(nested_comment, "#||#", 4);
+    try test_prod(nested_comment, "#| this is a comment |#", 23);
+    try test_prod(nested_comment, "#| this is a comment with nested comment #| i am nested |# |#", 61);
+    try test_prod(nested_comment, "#| before #| inner |# after |#", 30);
 }
