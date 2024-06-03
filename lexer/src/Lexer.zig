@@ -298,3 +298,16 @@ test nested_comment {
     try test_prod(nested_comment, "#| this is a comment with nested comment #| i am nested |# |#", 61);
     try test_prod(nested_comment, "#| before #| inner |# after |#", 30);
 }
+
+test "muliline_nested_comment" {
+    const input =
+        \\#|
+        \\  I am before the nested comment
+        \\  #|
+        \\    I am nested
+        \\  |#
+        \\  I am after the nested comment
+        \\|#
+    ;
+    try test_prod(nested_comment, input, 96);
+}

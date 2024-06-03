@@ -21,9 +21,6 @@ pub fn test_lexer(input: []const u8, expected: []const Token) !void {
     defer tokens.deinit();
 
     while (lexer.nextToken()) |token| try tokens.append(token);
-    // for (tokens.items) |token| {
-    //     std.debug.print("token: {any}\n", .{token.kind});
-    // }
     try std.testing.expectEqualSlices(Token, expected, tokens.items);
 }
 
