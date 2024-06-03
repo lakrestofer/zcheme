@@ -6,11 +6,14 @@ const test_prod = @import("./testing.zig").test_prod;
 // struct Lexer {
 input: []const u8,
 pos: usize,
-end_reached: bool = false,
+filter_atmosphere: bool = false,
 //}
 
+pub const LexerOptions = struct {
+    filter_atmosphere: bool = false,
+};
+
 pub const TokenKind = enum {
-    EOF, // \xOO
     INVALID, // some invalid token
     WHITESPACE, // ' \n\r\t' and whatever char isWhitespace deems to be a whitespace
     L_PAREN, // (
@@ -29,8 +32,9 @@ pub const TokenKind = enum {
     QUASI_SYNTAX, // #`
     UNSYNTAX, // #'
     UNSYNTAX_SPLICING, // #'@
-    COMMMENT,
+    COMMENT,
     IDENTIFIER,
+    INTERTOKEN_SPACE, // any space taken up by comments and whitespace
 };
 
 pub const Token = struct {
@@ -49,21 +53,22 @@ pub const Token = struct {
 
 const Self = @This();
 
-pub fn init(input: []const u8) Self {
+pub fn init(
+    input: []const u8,
+    options: LexerOptions,
+) Self {
     return Self{
         .input = input,
         .pos = 0,
+        .filter_atmosphere = options.filter_atmosphere,
     };
 }
 
 pub fn nextToken(self: *Self) ?Token {
-    if (self.end_reached) return null;
-    if (self.input.len <= self.pos) {
-        self.end_reached = true;
-        return Token.new(.EOF, self.pos, self.pos);
-    }
+    // consumes any whitespace or comments
+    if (self.filter_atmosphere) _ = intertoken_space(self.input, &self.pos);
 
-    // std.debug.print("current pos: {}\n", .{self.pos});
+    if (eof(self.input, &self.pos)) return null;
 
     const start = self.pos;
     if (whitespace(self.input, &self.pos)) return Token.new(.WHITESPACE, start, self.pos);
@@ -83,7 +88,7 @@ pub fn nextToken(self: *Self) ?Token {
     if (quasi_syntax(self.input, &self.pos)) return Token.new(.QUASI_SYNTAX, start, self.pos);
     if (unsyntax(self.input, &self.pos)) return Token.new(.UNSYNTAX, start, self.pos);
     if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
-    if (comment(self.input, &self.pos)) return Token.new(.COMMMENT, start, self.pos);
+    if (comment(self.input, &self.pos)) return Token.new(.COMMENT, start, self.pos);
 
     // if we found not invalid pos we increment pos by one,
     // such that we still progress somehow
@@ -93,6 +98,11 @@ pub fn nextToken(self: *Self) ?Token {
 }
 
 // === production rules begin ===
+
+fn eof(input: []const u8, pos: *usize) bool {
+    return pos.* >= input.len;
+}
+
 fn whitespace(input: []const u8, pos: *usize) bool {
     if (!isWhitespace(input[pos.*])) return false;
     while (pos.* < input.len and isWhitespace(input[pos.*])) pos.* += 1;
@@ -217,19 +227,20 @@ fn nested_comment(input: []const u8, pos: *usize) bool {
     return true;
 }
 
-TODO add testcase
 fn atmosphere(input: []const u8, pos: *usize) bool {
     return whitespace(input, pos) or comment(input, pos);
 }
 
-TODO add testcase
+// TODO add testcase
 fn intertoken_space(input: []const u8, pos: *usize) bool {
+    // since we run this at the start of every nextToken call
+    if (input.len <= pos.*) return false;
     if (!atmosphere(input, pos)) return false;
-    while (atmosphere(input, pos)) {}
+    while (pos.* < input.len and atmosphere(input, pos)) {}
     return true;
 }
 
-TODO add testcase
+// TODO add testcase
 fn identifier(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     if (!initial(input, &p)) return false;
@@ -238,25 +249,25 @@ fn identifier(input: []const u8, pos: *usize) bool {
     return true;
 }
 
-TODO add testcase
+// TODO add testcase
 fn initial(input: []const u8, pos: *usize) bool {
     return constituent(input, pos) or
         special_initial(input, pos);
     // inline_hex_escape(input, pos);
 }
 
-TODO add testcase
+// TODO add testcase
 fn constituent(input: []const u8, pos: *usize) bool {
     return letter(input, pos);
 }
 
-TODO add testcase
+// TODO add testcase
 fn letter(input: []const u8, pos: *usize) bool {
     if (!std.ascii.isAlphabetic(input[pos.*])) return false;
     pos.* += 1;
 }
 
-TODO add testcase
+// TODO add testcase
 fn special_initial(input: []const u8, pos: *usize) bool {
     const special = "!$%&*/:<=>?^_~";
     for (special) |c| {
@@ -362,4 +373,8 @@ test "muliline_nested_comment" {
         \\|#
     ;
     try test_prod(nested_comment, input, 96);
+}
+
+test intertoken_space {
+    try test_prod(intertoken_space, " \n   \t  ; a comment \n   \r  #| some other comment |#  ", 53);
 }

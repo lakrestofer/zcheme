@@ -16,7 +16,7 @@ pub fn test_prod(
 }
 
 pub fn test_lexer(input: []const u8, expected: []const Token) !void {
-    var lexer = Lexer.init(input);
+    var lexer = Lexer.init(input, .{});
     var tokens = std.ArrayList(Token).init(test_allocator);
     defer tokens.deinit();
 
@@ -33,7 +33,6 @@ test "(\n(\t)  )" {
         Token.new(.R_PAREN, 4, 5),
         Token.new(.WHITESPACE, 5, 7),
         Token.new(.R_PAREN, 7, 8),
-        Token.new(.EOF, 8, 8),
     }));
 }
 
@@ -43,7 +42,6 @@ test "#(())" {
         Token.new(.L_PAREN, 2, 3),
         Token.new(.R_PAREN, 3, 4),
         Token.new(.R_PAREN, 4, 5),
-        Token.new(.EOF, 5, 5),
     }));
 }
 
@@ -54,13 +52,12 @@ test "multiline with comments" {
         \\;and a comment
     ;
     try test_lexer(input, &([_]Token{
-        Token.new(.COMMMENT, 0, 35),
+        Token.new(.COMMENT, 0, 35),
         Token.new(.QUOTE, 35, 36),
         Token.new(.L_PAREN, 36, 37),
         Token.new(.R_PAREN, 37, 38),
         Token.new(.WHITESPACE, 38, 39),
-        Token.new(.COMMMENT, 39, 84),
-        Token.new(.COMMMENT, 84, 98),
-        Token.new(.EOF, 98, 98),
+        Token.new(.COMMENT, 39, 84),
+        Token.new(.COMMENT, 84, 98),
     }));
 }
