@@ -17,6 +17,8 @@ pub const TokenKind = enum {
     INVALID, // some invalid token
     IDENTIFIER,
     BOOLEAN,
+    CHARACTER,
+    STRING,
     L_PAREN, // (
     R_PAREN, // )
     L_SQUARE_PAREN, // [
@@ -92,6 +94,8 @@ pub fn nextToken(self: *Self) ?Token {
     if (comment(self.input, &self.pos)) return Token.new(.COMMENT, start, self.pos);
     if (identifier(self.input, &self.pos)) return Token.new(.IDENTIFIER, start, self.pos);
     if (boolean(self.input, &self.pos)) return Token.new(.BOOLEAN, start, self.pos);
+    if (character(self.input, &self.pos)) return Token.new(.CHARACTER, start, self.pos);
+    if (string(self.input, &self.pos)) return Token.new(.STRING, start, self.pos);
 
     // if we found not invalid pos we increment pos by one,
     // such that we still progress somehow
@@ -317,6 +321,23 @@ fn character(input: []const u8, pos: *usize) bool {
     return true;
 }
 
+fn string(input: []const u8, pos: *usize) bool {
+    if (!terminal_string("\"", input, pos)) return false;
+
+    while (pos.* < input.len and string_element(input, pos)) {}
+
+    if (!terminal_string("\"", input, pos)) return false;
+
+    return true;
+}
+
+fn string_element(input: []const u8, pos: *usize) bool {
+    if (input[pos.*] != '"') {
+        pos.* += 1;
+        return true;
+    }
+    return false;
+}
 // identifiers, characters, numbers and strings need to be terminated
 // by some delimiter or eof
 // does not advance pos (taken by copy and not reference)
@@ -593,4 +614,10 @@ test character {
     try test_prod(character, "#\\,", 3);
     try test_prod(character, "#\\'", 3);
     try test_prod(character, "#\\a", 3);
+}
+
+test string {
+    try test_prod(string, "\"this is a string\"", 18);
+    try test_prod(string, "\"another one\"", 13);
+    try test_prod(string, "\"\"", 2);
 }
