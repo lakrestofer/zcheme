@@ -1,7 +1,7 @@
 const std = @import("std");
 const isWhitespace = std.ascii.isWhitespace;
-const test_lexer = @import("./testing.zig").test_lexer;
-const test_prod = @import("./testing.zig").test_prod;
+const test_lexer = @import("./tests/test.zig").test_lexer;
+const test_prod = @import("./tests/test.zig").test_prod;
 
 // struct Lexer {
 input: []const u8,
@@ -15,7 +15,8 @@ pub const LexerOptions = struct {
 
 pub const TokenKind = enum {
     INVALID, // some invalid token
-    WHITESPACE, // ' \n\r\t' and whatever char isWhitespace deems to be a whitespace
+    IDENTIFIER,
+    BOOLEAN,
     L_PAREN, // (
     R_PAREN, // )
     L_SQUARE_PAREN, // [
@@ -33,7 +34,7 @@ pub const TokenKind = enum {
     UNSYNTAX, // #'
     UNSYNTAX_SPLICING, // #'@
     COMMENT,
-    IDENTIFIER,
+    WHITESPACE, // ' \n\r\t' and whatever char isWhitespace deems to be a whitespace
     INTERTOKEN_SPACE, // any space taken up by comments and whitespace
 };
 
@@ -90,6 +91,7 @@ pub fn nextToken(self: *Self) ?Token {
     if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
     if (comment(self.input, &self.pos)) return Token.new(.COMMENT, start, self.pos);
     if (identifier(self.input, &self.pos)) return Token.new(.IDENTIFIER, start, self.pos);
+    if (boolean(self.input, &self.pos)) return Token.new(.BOOLEAN, start, self.pos);
 
     // if we found not invalid pos we increment pos by one,
     // such that we still progress somehow
@@ -240,7 +242,6 @@ fn intertoken_space(input: []const u8, pos: *usize) bool {
     return true;
 }
 
-// TODO add testcase
 fn identifier(input: []const u8, pos: *usize) bool {
     // either initial subsequent*
     if (initial(input, pos)) {
@@ -251,14 +252,21 @@ fn identifier(input: []const u8, pos: *usize) bool {
     return peculiar_identifier(input, pos);
 }
 
-// TODO add testcase
+fn boolean(input: []const u8, pos: *usize) bool {
+    if (input[pos.*..].len < 2) return false;
+    if (input[pos.*] != '#') return false;
+    for ("tTfF") |c| if (input[pos.* + 1] == c) {
+        pos.* += 2;
+        return true;
+    };
+    return false;
+}
 fn initial(input: []const u8, pos: *usize) bool {
     return constituent(input, pos) or
         special_initial(input, pos) or
         inline_hex_escape(input, pos);
 }
 
-// TODO add testcase
 fn constituent(input: []const u8, pos: *usize) bool {
     return letter(input, pos);
 }
@@ -291,14 +299,12 @@ fn hex_digit(input: []const u8, pos: *usize) bool {
     return false;
 }
 
-// TODO add testcase
 fn letter(input: []const u8, pos: *usize) bool {
     if (!std.ascii.isAlphabetic(input[pos.*])) return false;
     pos.* += 1;
     return true;
 }
 
-// TODO add testcase
 const SPECIAL = "!$%&*/:<=>?^_~";
 fn special_initial(input: []const u8, pos: *usize) bool {
     const input_c = input[pos.*];
@@ -486,4 +492,11 @@ test identifier {
     try test_prod(identifier, "a34kTMNs", 8);
     try test_prod(identifier, "->-", 3);
     try test_prod(identifier, "the-word-recursion-has-many-meanings", 36);
+}
+
+test boolean {
+    try test_prod(boolean, "#t", 2);
+    try test_prod(boolean, "#T", 2);
+    try test_prod(boolean, "#f", 2);
+    try test_prod(boolean, "#F", 2);
 }

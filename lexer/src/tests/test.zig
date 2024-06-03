@@ -1,6 +1,6 @@
 const std = @import("std");
 const test_allocator = std.testing.allocator;
-const Lexer = @import("./Lexer.zig");
+const Lexer = @import("../Lexer.zig");
 const Token = Lexer.Token;
 
 /// test a single production rule that should match
