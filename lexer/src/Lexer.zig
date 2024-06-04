@@ -63,6 +63,7 @@ pub fn init(
     return Self{
         .input = input,
         .pos = 0,
+        // should intertoken_space be included in the output or not?
         .filter_atmosphere = options.filter_atmosphere,
     };
 }
@@ -331,12 +332,35 @@ fn string(input: []const u8, pos: *usize) bool {
     return true;
 }
 
+fn intraline_whitespace(input: []const u8, pos: *usize) bool {
+    return terminal_string("\t", input, pos) or terminal_string(" ", input, pos);
+}
+
 fn string_element(input: []const u8, pos: *usize) bool {
-    if (input[pos.*] != '"') {
-        pos.* += 1;
-        return true;
-    }
-    return false;
+    if (input[pos.*] == '\"') return false;
+
+    // check for some correct usages of '\'
+    if ((inline_hex_escape(input, pos) or
+        terminal_string("\\\t", input, pos) or // intraline_whitespace rule
+        terminal_string("\\ ", input, pos) or // intraline_whitespace rule
+        terminal_string("\\a", input, pos) or
+        terminal_string("\\b", input, pos) or
+        terminal_string("\\t", input, pos) or
+        terminal_string("\\n", input, pos) or
+        terminal_string("\\v", input, pos) or
+        terminal_string("\\f", input, pos) or
+        terminal_string("\\r", input, pos) or
+        terminal_string("\\\"", input, pos) or
+        terminal_string("\\\\", input, pos))) return true;
+
+    if (input[pos.*] == '\\') return false;
+
+    // NOTE the gramar specifies some other internal rule
+
+    // the char is some other char (valid), increment the cursor
+    pos.* += 1;
+
+    return true;
 }
 // identifiers, characters, numbers and strings need to be terminated
 // by some delimiter or eof
@@ -371,10 +395,9 @@ fn constituent(input: []const u8, pos: *usize) bool {
 
 fn inline_hex_escape(input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    // must contain space enough for \x'.' where . is some hex scalar
-    if (input[p..].len < 3 or !std.mem.eql(u8, input[p..(p + 2)], "\\x")) return false;
-    p += 2; // "\x"
+    if (!terminal_string("\\x", input, &p)) return false;
     if (!hex_scalar_value(input, &p)) return false;
+    if (!terminal_string(";", input, &p)) return false;
     pos.* = p;
     return true;
 }
@@ -388,7 +411,7 @@ fn hex_scalar_value(input: []const u8, pos: *usize) bool {
 fn hex_digit(input: []const u8, pos: *usize) bool {
     if (digit(input, pos)) return true;
 
-    if ((25 <= input[pos.*] and input[pos.*] <= 70) or // A-F
+    if ((65 <= input[pos.*] and input[pos.*] <= 70) or // A-F
         (97 <= input[pos.*] and input[pos.*] <= 102)) // a-f
     {
         pos.* += 1;
@@ -573,11 +596,12 @@ test identifier {
     try test_prod(identifier, "^", 1);
     try test_prod(identifier, "_", 1);
     try test_prod(identifier, "~", 1);
+
     // constituent subsequent* identifier
     try test_prod(identifier, "imAnIdentifier", 14);
 
     // using inline hex escape
-    try test_prod(identifier, "\\x0123456789abcdefABCDEF", 24); // TRIVIA: this value is just north of 2^80
+    try test_prod(identifier, "\\x0123456789abcdefABCDEF;", 25); // TRIVIA: this value is just north of 2^80
 
     // some identifiers from the r6rs spec
     try test_prod(identifier, "lambda", 6);
@@ -620,4 +644,6 @@ test string {
     try test_prod(string, "\"this is a string\"", 18);
     try test_prod(string, "\"another one\"", 13);
     try test_prod(string, "\"\"", 2);
+    try test_prod(string, "\" \\t \\n \\v \\\" \\\\ \"", 18);
+    try test_prod(string, "\"\\ \\\t\"", 6);
 }
