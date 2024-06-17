@@ -966,3 +966,11 @@ test radix {
         try std.testing.expectEqual(0, pos);
     }
 }
+
+test exactness {
+    try test_prod(exactness, "#i", 2);
+    try test_prod(exactness, "#I", 2);
+    try test_prod(exactness, "#e", 2);
+    try test_prod(exactness, "#E", 2);
+    try std.testing.expectError(error.TestUnexpectedResult, test_prod(exactness, "#b", 0));
+}
