@@ -644,10 +644,10 @@ fn exactness(input: []const u8, pos: *usize) bool {
 fn radix(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
     const matched = switch (base) {
-        2 => match_char('#', input, &p) or match_any_char("bB", input, &p),
-        8 => match_char('#', input, &p) or match_any_char("oO", input, &p),
-        10 => match_char('#', input, &p) or match_any_char("dD", input, &p) or true,
-        16 => match_char('#', input, &p) or match_any_char("xX", input, &p),
+        2 => match_char('#', input, &p) and match_any_char("bB", input, &p),
+        8 => match_char('#', input, &p) and match_any_char("oO", input, &p),
+        10 => (match_char('#', input, &p) and match_any_char("dD", input, &p)) or true,
+        16 => match_char('#', input, &p) and match_any_char("xX", input, &p),
         else => @compileError("invalid base! must be one of 2,8,10 or 16"),
     };
     if (matched) pos.* = p;
@@ -912,6 +912,57 @@ test digit {
             std.debug.print("test failed (match was true) for input: {s}", .{digits[i..]});
             return e;
         };
+        try std.testing.expectEqual(0, pos);
+    }
+}
+
+test radix {
+    // base 2
+    {
+        var pos: usize = 0;
+        try std.testing.expect(radix(2, "#b", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(radix(2, "#B", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(!radix(2, "#Q", &pos));
+        try std.testing.expectEqual(0, pos);
+    }
+    // base 8
+    {
+        var pos: usize = 0;
+        try std.testing.expect(radix(8, "#o", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(radix(8, "#O", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(!radix(8, "#Q", &pos));
+        try std.testing.expectEqual(0, pos);
+    }
+    // base 10
+    {
+        var pos: usize = 0;
+        try std.testing.expect(radix(10, "#d", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(radix(10, "#D", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(radix(10, "whatever", &pos));
+        try std.testing.expectEqual(0, pos);
+    }
+    // base 16
+    {
+        var pos: usize = 0;
+        try std.testing.expect(radix(16, "#x", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(radix(16, "#X", &pos));
+        try std.testing.expectEqual(2, pos);
+        pos = 0;
+        try std.testing.expect(!radix(16, "#Q", &pos));
         try std.testing.expectEqual(0, pos);
     }
 }
