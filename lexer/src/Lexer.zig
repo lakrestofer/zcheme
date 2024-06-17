@@ -974,3 +974,9 @@ test exactness {
     try test_prod(exactness, "#E", 2);
     try std.testing.expectError(error.TestUnexpectedResult, test_prod(exactness, "#b", 0));
 }
+
+test sign {
+    try test_prod(sign, "+", 1);
+    try test_prod(sign, "-", 1);
+    try test_prod(sign, "whatever", 0);
+}
