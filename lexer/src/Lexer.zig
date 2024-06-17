@@ -588,7 +588,7 @@ fn uinteger(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // match at least one
     if (!digit(base, input, &p)) return false;
-    while (!digit(base, input, &p)) {}
+    while (p < input.len and digit(base, input, &p)) {}
     pos.* = p;
     return true;
 }
@@ -979,4 +979,10 @@ test sign {
     try test_prod(sign, "+", 1);
     try test_prod(sign, "-", 1);
     try test_prod(sign, "whatever", 0);
+}
+test mantissa_width {
+    try test_prod(mantissa_width, "|123", 4);
+    try test_prod(mantissa_width, "whatever", 0);
+    try test_prod(mantissa_width, "|abc", 0);
+    try test_prod(mantissa_width, "whatever", 0);
 }
