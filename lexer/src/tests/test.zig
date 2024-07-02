@@ -15,6 +15,15 @@ pub fn test_prod(
     try std.testing.expectEqual(expected_end, pos);
 }
 
+pub fn test_token(
+    input: []const u8,
+    expected_token: Token,
+) !void {
+    var lexer = Lexer.init(input, .{});
+    const token = lexer.nextToken() orelse return error.NoTokenError;
+    try std.testing.expectEqual(expected_token, token);
+}
+
 // for the productions that require to be parameterized with
 // a comptime_int
 pub fn test_prod_base(
@@ -33,41 +42,13 @@ pub fn test_lexer(input: []const u8, expected: []const Token, options: Lexer.Lex
     var tokens = std.ArrayList(Token).init(test_allocator);
     defer tokens.deinit();
 
-    while (lexer.nextToken()) |token| try tokens.append(token);
+    while (lexer.nextToken()) |token| {
+        try tokens.append(token);
+    }
     try std.testing.expectEqualSlices(Token, expected, tokens.items);
 }
 
-test "(\n(\t)  )" {
-    try test_lexer("(\n(\t)  )", &([_]Token{
-        Token.new(.L_PAREN, 0, 1),
-        Token.new(.L_PAREN, 2, 3),
-        Token.new(.R_PAREN, 4, 5),
-        Token.new(.R_PAREN, 7, 8),
-    }), .{ .filter_atmosphere = true });
-}
-
-test "#(())" {
-    try test_lexer("#(())", &([_]Token{
-        Token.new(.L_VEC_PAREN, 0, 2),
-        Token.new(.L_PAREN, 2, 3),
-        Token.new(.R_PAREN, 3, 4),
-        Token.new(.R_PAREN, 4, 5),
-    }), .{ .filter_atmosphere = true });
-}
-
-test "multiline with comments" {
-    const input =
-        \\; this is a comment with a newline
-        \\'() ; here is another with a manual newline \r\n
-        \\;and a comment
-    ;
-    try test_lexer(input, &([_]Token{
-        Token.new(.COMMENT, 0, 35),
-        Token.new(.QUOTE, 35, 36),
-        Token.new(.L_PAREN, 36, 37),
-        Token.new(.R_PAREN, 37, 38),
-        Token.new(.WHITESPACE, 38, 39),
-        Token.new(.COMMENT, 39, 84),
-        Token.new(.COMMENT, 84, 98),
-    }), .{});
+test {
+    // most of the syntax tests are in this file
+    _ = @import("./syntax.zig");
 }

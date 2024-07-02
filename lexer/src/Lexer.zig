@@ -413,6 +413,7 @@ fn hex_scalar_value(input: []const u8, pos: *usize) bool {
     return true;
 }
 fn hex_digit(input: []const u8, pos: *usize) bool {
+    if (pos.* >= input.len) return false;
     if (digit10(input, pos)) return true;
 
     if ((65 <= input[pos.*] and input[pos.*] <= 70) or // A-F
@@ -468,7 +469,7 @@ fn peculiar_identifier(input: []const u8, pos: *usize) bool {
 }
 
 fn digit10(input: []const u8, pos: *usize) bool {
-    if (!std.ascii.isDigit(input[pos.*])) return false;
+    if (pos.* >= input.len or !std.ascii.isDigit(input[pos.*])) return false;
     pos.* += 1;
     return true;
 }
@@ -483,8 +484,14 @@ fn special_subsequent(input: []const u8, pos: *usize) bool {
     return res;
 }
 
+test "quick" {
+    // var p: usize = 0;
+    // const input = "";
+    // try std.testing.expect(digit10(input, &p));
+}
+
 fn number(input: []const u8, pos: *usize) bool {
-    return num(2, input, pos) or num(8, input, pos) or num(10, input, pos) or num(16, input, pos);
+    return (num(2, input, pos) or num(8, input, pos) or num(10, input, pos) or num(16, input, pos)) and delimiter_termination(input, pos.*);
 }
 
 fn num(base: comptime_int, input: []const u8, pos: *usize) bool {
@@ -562,7 +569,7 @@ fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // <digit 10>+ . <digit 10>* suffix
     if (uinteger(10, input, &p) and match_char('.', input, &p)) {
-        _ = uinteger(10, input, &p);
+        _ = uinteger(10, input, &p); // optional
         if (suffix(input, &p)) {
             pos.* = p;
             return true;
@@ -582,7 +589,7 @@ fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
         return true;
     }
 
-    return true;
+    return false;
 }
 fn uinteger(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
@@ -594,19 +601,13 @@ fn uinteger(base: comptime_int, input: []const u8, pos: *usize) bool {
 }
 fn prefix(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    // TODO why does this not match?
-    if (radix(base, input, &p)) {
-        _ = exactness(input, &p);
+    if (radix(base, input, &p) and exactness(input, &p)) {
         pos.* = p;
         return true;
     }
-    p = pos.*;
-    if (exactness(input, &p)) {
-        _ = radix(base, input, &p);
-        pos.* = p;
-        return true;
-    }
-    return false;
+    _ = exactness(input, pos); // always returns true
+    _ = radix(base, input, pos); // optional
+    return true;
 }
 fn suffix(input: []const u8, pos: *usize) bool {
     var p = pos.*;
