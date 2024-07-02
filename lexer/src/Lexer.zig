@@ -2,6 +2,7 @@ const std = @import("std");
 const isWhitespace = std.ascii.isWhitespace;
 const test_lexer = @import("./tests/test.zig").test_lexer;
 const test_prod = @import("./tests/test.zig").test_prod;
+const test_prod_base = @import("./tests/test.zig").test_prod_base;
 
 // struct Lexer {
 input: []const u8,
@@ -483,8 +484,7 @@ fn special_subsequent(input: []const u8, pos: *usize) bool {
 }
 
 fn number(input: []const u8, pos: *usize) bool {
-    inline for (([_]u8{ 2, 8, 10, 16 })) |base| if (num(base, input, pos)) return true;
-    return false;
+    return num(2, input, pos) or num(8, input, pos) or num(10, input, pos) or num(16, input, pos);
 }
 
 fn num(base: comptime_int, input: []const u8, pos: *usize) bool {
@@ -549,7 +549,7 @@ fn ureal(base: comptime_int, input: []const u8, pos: *usize) bool {
 
     p = pos.*;
 
-    if (decimal(base, input, &p) and mantissa_width(input, &p)) {
+    if (decimal(10, input, &p) and mantissa_width(input, &p)) {
         pos.* = p;
         return true;
     }
@@ -557,10 +557,20 @@ fn ureal(base: comptime_int, input: []const u8, pos: *usize) bool {
     return matched_ureal;
 }
 fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
-    _ = base;
-    var p = pos.*;
+    if (base != 10) @compileError("invalid base! decimal notation is only defined for base 10");
 
-    // <uiniteger 10> <suffix>
+    var p = pos.*;
+    // <digit 10>+ . <digit 10>* suffix
+    if (uinteger(10, input, &p) and match_char('.', input, &p)) {
+        _ = uinteger(10, input, &p);
+        if (suffix(input, &p)) {
+            pos.* = p;
+            return true;
+        }
+        return false;
+    }
+    p = pos.*;
+    // <digit 10>+ <suffix>
     if (uinteger(10, input, &p) and suffix(input, &p)) {
         pos.* = p;
         return true;
@@ -571,17 +581,7 @@ fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
         pos.* = p;
         return true;
     }
-    // <digit 10>+ . <digit 10>* suffix
-    if (uinteger(10, input, &p) and match_char('.', input, &p)) {
-        _ = uinteger(10, input, &p);
-        if (suffix(input, &p)) {
-            pos.* = p;
-            return true;
-        }
-        return false;
-    }
 
-    p = pos.*;
     return true;
 }
 fn uinteger(base: comptime_int, input: []const u8, pos: *usize) bool {
@@ -594,11 +594,15 @@ fn uinteger(base: comptime_int, input: []const u8, pos: *usize) bool {
 }
 fn prefix(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    if (radix(base, input, &p) and exactness(input, &p)) {
+    // TODO why does this not match?
+    if (radix(base, input, &p)) {
+        _ = exactness(input, &p);
         pos.* = p;
         return true;
     }
-    if (exactness(input, &p) and radix(base, input, &p)) {
+    p = pos.*;
+    if (exactness(input, &p)) {
+        _ = radix(base, input, &p);
         pos.* = p;
         return true;
     }
@@ -606,6 +610,7 @@ fn prefix(base: comptime_int, input: []const u8, pos: *usize) bool {
 }
 fn suffix(input: []const u8, pos: *usize) bool {
     var p = pos.*;
+
     if (exponent_marker(input, &p) and sign(input, &p) and uinteger(10, input, &p)) {
         pos.* = p;
         return true;
@@ -634,16 +639,19 @@ fn sign(input: []const u8, pos: *usize) bool {
 fn exactness(input: []const u8, pos: *usize) bool {
     var p = pos.*;
 
-    if (!match_char('#', input, &p)) return false;
-    if (!match_any_char("iIeE", input, &p)) return false;
+    if (match_char('#', input, &p)) {
+        if (match_any_char("iIeE", input, &p)) {
+            pos.* = p;
+            return true;
+        }
+        return false; // syntax error
+    }
 
-    pos.* = p;
     return true;
 }
-
 fn radix(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    const matched = switch (base) {
+    const matched: bool = switch (base) {
         2 => match_char('#', input, &p) and match_any_char("bB", input, &p),
         8 => match_char('#', input, &p) and match_any_char("oO", input, &p),
         10 => (match_char('#', input, &p) and match_any_char("dD", input, &p)) or true,
@@ -668,6 +676,8 @@ fn digit(base: comptime_int, input: []const u8, pos: *usize) bool {
 
 // utils
 inline fn match_str(comptime expected: []const u8, input: []const u8, pos: *usize) bool {
+    if (pos.* >= input.len) return false;
+
     if (std.mem.startsWith(u8, input[pos.*..], expected)) {
         pos.* += expected.len;
         return true;
@@ -676,8 +686,9 @@ inline fn match_str(comptime expected: []const u8, input: []const u8, pos: *usiz
 }
 // match the provided char `char` only
 inline fn match_char(comptime char: u8, input: []const u8, pos: *usize) bool {
-    const c = input[pos.*];
-    if (char == c) {
+    if (pos.* >= input.len) return false;
+
+    if (pos.* < input.len and char == input[pos.*]) {
         pos.* += 1;
         return true;
     }
@@ -685,6 +696,8 @@ inline fn match_char(comptime char: u8, input: []const u8, pos: *usize) bool {
 }
 // match any of the chars in the set `chars`
 inline fn match_any_char(comptime chars: []const u8, input: []const u8, pos: *usize) bool {
+    if (pos.* >= input.len) return false;
+
     const c = input[pos.*];
     for (chars) |char| {
         if (char == c) {
@@ -966,7 +979,6 @@ test radix {
         try std.testing.expectEqual(0, pos);
     }
 }
-
 test exactness {
     try test_prod(exactness, "#i", 2);
     try test_prod(exactness, "#I", 2);
@@ -974,7 +986,6 @@ test exactness {
     try test_prod(exactness, "#E", 2);
     try std.testing.expectError(error.TestUnexpectedResult, test_prod(exactness, "#b", 0));
 }
-
 test sign {
     try test_prod(sign, "+", 1);
     try test_prod(sign, "-", 1);
@@ -985,4 +996,67 @@ test mantissa_width {
     try test_prod(mantissa_width, "whatever", 0);
     try test_prod(mantissa_width, "|abc", 0);
     try test_prod(mantissa_width, "whatever", 0);
+}
+test exponent_marker {
+    try test_prod(exponent_marker, "e", 1);
+    try test_prod(exponent_marker, "E", 1);
+    try test_prod(exponent_marker, "s", 1);
+    try test_prod(exponent_marker, "S", 1);
+    try test_prod(exponent_marker, "f", 1);
+    try test_prod(exponent_marker, "F", 1);
+    try test_prod(exponent_marker, "d", 1);
+    try test_prod(exponent_marker, "D", 1);
+    try test_prod(exponent_marker, "l", 1);
+    try test_prod(exponent_marker, "L", 1);
+}
+test suffix {
+    try test_prod(suffix, "whatever", 0);
+    try test_prod(suffix, "e10", 3);
+    try test_prod(suffix, "E+1", 3);
+    try test_prod(suffix, "s+10", 4);
+    try test_prod(suffix, "S1", 2);
+    try test_prod(suffix, "f10", 3);
+    try test_prod(suffix, "F1", 2);
+    try test_prod(suffix, "d10", 3);
+    try test_prod(suffix, "D1", 2);
+    try test_prod(suffix, "l10", 3);
+    try test_prod(suffix, "L1", 2);
+}
+
+test prefix {
+    // base 2 prefixes
+    try test_prod_base(prefix, 2, "#i", 2);
+    try test_prod_base(prefix, 2, "#I", 2);
+    try test_prod_base(prefix, 2, "#e", 2);
+    try test_prod_base(prefix, 2, "#E", 2);
+    try test_prod_base(prefix, 2, "#b", 2);
+    try test_prod_base(prefix, 2, "#B", 2);
+    try test_prod_base(prefix, 2, "#b#i", 4);
+    try test_prod_base(prefix, 2, "#b#I", 4);
+    try test_prod_base(prefix, 2, "#b#e", 4);
+    try test_prod_base(prefix, 2, "#b#E", 4);
+    try test_prod_base(prefix, 2, "#B#i", 4);
+    try test_prod_base(prefix, 2, "#B#I", 4);
+    try test_prod_base(prefix, 2, "#B#e", 4);
+    try test_prod_base(prefix, 2, "#B#E", 4);
+    // base 8 prefix
+    try test_prod_base(prefix, 8, "#o", 2);
+    try test_prod_base(prefix, 8, "#O", 2);
+    try test_prod_base(prefix, 8, "#o#i", 4);
+    try test_prod_base(prefix, 8, "#o#I", 4);
+    try test_prod_base(prefix, 8, "#o#e", 4);
+    try test_prod_base(prefix, 8, "#o#E", 4);
+    try test_prod_base(prefix, 8, "#O#i", 4);
+    try test_prod_base(prefix, 8, "#O#I", 4);
+    try test_prod_base(prefix, 8, "#O#e", 4);
+    try test_prod_base(prefix, 8, "#O#E", 4);
+}
+
+test decimal {
+    try test_prod_base(decimal, 10, "123", 3);
+    try test_prod_base(decimal, 10, "123e10", 6);
+    try test_prod_base(decimal, 10, "123e-10", 7);
+    try test_prod_base(decimal, 10, "123e+10", 7);
+    try test_prod_base(decimal, 10, ".123d+10", 8);
+    try test_prod_base(decimal, 10, "1123.123d+10", 12);
 }
