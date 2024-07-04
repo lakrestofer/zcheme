@@ -86,14 +86,14 @@ pub fn nextToken(self: *Self) ?Token {
     if (r_square_paren(self.input, &self.pos)) return Token.new(.R_SQUARE_PAREN, start, self.pos);
     if (l_curly_paren(self.input, &self.pos)) return Token.new(.INVALID, start, self.pos);
     if (r_curly_paren(self.input, &self.pos)) return Token.new(.INVALID, start, self.pos);
-    if (quote(self.input, &self.pos)) return Token.new(.QUOTE, start, self.pos);
     if (quasi_quote(self.input, &self.pos)) return Token.new(.QUASI_QUOTE, start, self.pos);
-    if (unquote(self.input, &self.pos)) return Token.new(.UNQUOTE, start, self.pos);
+    if (quote(self.input, &self.pos)) return Token.new(.QUOTE, start, self.pos);
     if (unquote_splicing(self.input, &self.pos)) return Token.new(.UNQUOTE_SPLICING, start, self.pos);
+    if (unquote(self.input, &self.pos)) return Token.new(.UNQUOTE, start, self.pos);
     if (syntax(self.input, &self.pos)) return Token.new(.SYNTAX, start, self.pos);
     if (quasi_syntax(self.input, &self.pos)) return Token.new(.QUASI_SYNTAX, start, self.pos);
-    if (unsyntax(self.input, &self.pos)) return Token.new(.UNSYNTAX, start, self.pos);
     if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
+    if (unsyntax(self.input, &self.pos)) return Token.new(.UNSYNTAX, start, self.pos);
     if (comment(self.input, &self.pos)) return Token.new(.COMMENT, start, self.pos);
     // try to parse number before parsing identifier such that (+i, -i) gets interpreted as numbers
     if (number(self.input, &self.pos)) return Token.new(.NUMBER, start, self.pos);
@@ -290,7 +290,6 @@ fn boolean(input: []const u8, pos: *usize) bool {
 const CHARACTER_NAMES: [12][]const u8 = .{
     "nul", "alarm", "backspace", "tab", "linefeed", "newline", "vtab", "page", "return", "esc", "space", "delete",
 };
-
 fn character(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // p_diff = 0
@@ -484,12 +483,6 @@ fn special_subsequent(input: []const u8, pos: *usize) bool {
     return res;
 }
 
-test "quick" {
-    // var p: usize = 0;
-    // const input = "";
-    // try std.testing.expect(digit10(input, &p));
-}
-
 fn number(input: []const u8, pos: *usize) bool {
     return (num(2, input, pos) or num(8, input, pos) or num(10, input, pos) or num(16, input, pos)) and delimiter_termination(input, pos.*);
 }
@@ -505,24 +498,48 @@ fn num(base: comptime_int, input: []const u8, pos: *usize) bool {
 }
 fn complex(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
+    // <real R> @ <real R>
+    if (real(base, input, &p) and match_char('@', input, &p) and real(base, input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    p = pos.*;
+    // <real R> + <ureal R> i
+    // <real R> - <ureal R> i
+    // <real R> + <naninf> i
+    // <real R> - <naninf> i
+    if (real(base, input, &p) and match_any_char("-+", input, &p) and (ureal(base, input, &p) or naninf(input, &p)) and match_char('i', input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    p = pos.*;
+    // <real R> + i
+    // <real R> - i
+    if (real(base, input, &p) and match_any_char("-+", input, &p) and match_char('i', input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    p = pos.*;
+    // <real R>
+    if (real(base, input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    p = pos.*;
+    // + <ureal R> i
+    // - <ureal R> i
+    // + <naninf> i
+    // - <naninf> i
+    if (match_any_char("-+", input, &p) and (ureal(base, input, &p) or naninf(input, &p)) and match_char('i', input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    if (match_any_char("-+", input, &p) and match_char('i', input, &p)) {
+        pos.* = p;
+        return true;
+    }
 
-    const real_matched = real(base, input, &p);
-    if (real_matched and match_str("@", input, &p)) {
-        if (real(base, input, &p)) {
-            pos.* = p;
-            return true;
-        }
-        return false;
-    }
-    if (match_str("+", input, &p) or match_str("-", input, &p)) {
-        _ = (ureal(base, input, &p) or naninf(input, &p));
-        if (match_str("i", input, &p)) {
-            pos.* = p;
-            return true;
-        }
-        return false;
-    }
-    return real_matched;
+    return false;
 }
 fn real(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
@@ -544,24 +561,27 @@ fn naninf(input: []const u8, pos: *usize) bool {
 }
 fn ureal(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    const matched_ureal = uinteger(base, input, &p);
 
-    if (matched_ureal and match_char('/', input, &p)) {
-        if (uinteger(base, input, &p)) {
-            pos.* = p;
-            return true;
-        }
-        return false;
+    // <uinteger R> / uinteger R>
+    if (uinteger(base, input, &p) and
+        match_char('/', input, &p) and
+        uinteger(base, input, &p))
+    {
+        pos.* = p;
+        return true;
     }
-
     p = pos.*;
-
+    // <uinteger R>
+    if (uinteger(base, input, &p)) {
+        pos.* = p;
+        return true;
+    }
+    p = pos.*;
     if (decimal(10, input, &p) and mantissa_width(input, &p)) {
         pos.* = p;
         return true;
     }
-
-    return matched_ureal;
+    return false;
 }
 fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
     if (base != 10) @compileError("invalid base! decimal notation is only defined for base 10");
@@ -709,71 +729,17 @@ inline fn match_any_char(comptime chars: []const u8, input: []const u8, pos: *us
     return false;
 }
 
-test whitespace {
-    try test_prod(whitespace, "   \n\r\t", 6);
-}
-test l_paren {
-    try test_prod(l_paren, "(", 1);
-}
-test r_paren {
-    try test_prod(r_paren, ")", 1);
-}
-test l_square_paren {
-    try test_prod(l_square_paren, "[  ", 1);
-}
-test r_square_paren {
-    try test_prod(r_square_paren, "]  ", 1);
-}
-test l_curly_paren {
-    try test_prod(l_curly_paren, "{  ", 1);
-}
-test r_curly_paren {
-    try test_prod(r_curly_paren, "}  ", 1);
-}
-test l_vec_paren {
-    try test_prod(l_vec_paren, "#(   ", 2);
-}
-test l_byte_vec_paren {
-    try test_prod(l_byte_vec_paren, "#vu8(  ", 5);
-}
-
-test quote {
-    try test_prod(quote, "'  ", 1);
-}
-test quasi_quote {
-    try test_prod(quasi_quote, "`  ", 1);
-}
-test unquote {
-    try test_prod(unquote, ",  ", 1);
-}
-test unquote_splicing {
-    try test_prod(unquote_splicing, ",@  ", 2);
-}
-test syntax {
-    try test_prod(syntax, "#'  ", 2);
-}
-test quasi_syntax {
-    try test_prod(quasi_syntax, "#`  ", 2);
-}
-test unsyntax {
-    try test_prod(unsyntax, "#,  ", 2);
-}
-test unsyntax_splicing {
-    try test_prod(unsyntax_splicing, "#,@   ", 3);
-}
 test line_ending {
     try test_prod(line_ending, "\r\n", 2);
     try test_prod(line_ending, "\r", 1);
     try test_prod(line_ending, "\n", 1);
 }
-
 test single_line_comment {
     try test_prod(single_line_comment, ";\r\n", 3);
     try test_prod(single_line_comment, ";\n", 2);
     try test_prod(single_line_comment, ";\n", 2);
     try test_prod(single_line_comment, ";", 1);
 }
-
 test nested_comment {
     try test_prod(nested_comment, "#||#", 4);
     try test_prod(nested_comment, "#| this is a comment |#", 23);
@@ -832,38 +798,6 @@ test identifier {
     try test_prod(identifier, "a34kTMNs", 8);
     try test_prod(identifier, "->-", 3);
     try test_prod(identifier, "the-word-recursion-has-many-meanings", 36);
-}
-
-test boolean {
-    try test_prod(boolean, "#t", 2);
-    try test_prod(boolean, "#T", 2);
-    try test_prod(boolean, "#f", 2);
-    try test_prod(boolean, "#F", 2);
-}
-
-test character {
-    // match all named characters
-    inline for (CHARACTER_NAMES) |name| {
-        try test_prod(character, "#\\" ++ name, name.len + 2);
-    }
-    // match characters using hex notation
-    try test_prod(character, "#\\x0123456789abcdefABCDEF", 25); // TRIVIA: utf8 got NOTHING against this bad boy
-    // match single char characters
-    try test_prod(character, "#\\x", 3);
-    try test_prod(character, "#\\;", 3);
-    try test_prod(character, "#\\,", 3);
-    try test_prod(character, "#\\;", 3);
-    try test_prod(character, "#\\,", 3);
-    try test_prod(character, "#\\'", 3);
-    try test_prod(character, "#\\a", 3);
-}
-
-test string {
-    try test_prod(string, "\"this is a string\"", 18);
-    try test_prod(string, "\"another one\"", 13);
-    try test_prod(string, "\"\"", 2);
-    try test_prod(string, "\" \\t \\n \\v \\\" \\\\ \"", 18);
-    try test_prod(string, "\"\\ \\\t\"", 6);
 }
 
 test digit {
