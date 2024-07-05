@@ -33,6 +33,7 @@ pub const TokenKind = enum {
     QUASI_QUOTE, // `
     UNQUOTE, // ,
     UNQUOTE_SPLICING, // ,@
+    PERIOD, // .
     SYNTAX, // #'
     QUASI_SYNTAX, // #`
     UNSYNTAX, // #'
@@ -90,6 +91,7 @@ pub fn nextToken(self: *Self) ?Token {
     if (quote(self.input, &self.pos)) return Token.new(.QUOTE, start, self.pos);
     if (unquote_splicing(self.input, &self.pos)) return Token.new(.UNQUOTE_SPLICING, start, self.pos);
     if (unquote(self.input, &self.pos)) return Token.new(.UNQUOTE, start, self.pos);
+    if (period(self.input, &self.pos)) return Token.new(.PERIOD, start, self.pos);
     if (syntax(self.input, &self.pos)) return Token.new(.SYNTAX, start, self.pos);
     if (quasi_syntax(self.input, &self.pos)) return Token.new(.QUASI_SYNTAX, start, self.pos);
     if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.UNSYNTAX_SPLICING, start, self.pos);
@@ -156,6 +158,9 @@ fn unquote(input: []const u8, pos: *usize) bool {
 }
 fn unquote_splicing(input: []const u8, pos: *usize) bool {
     return match_str(",@", input, pos);
+}
+fn period(input: []const u8, pos: *usize) bool {
+    return match_char('.', input, pos);
 }
 fn syntax(input: []const u8, pos: *usize) bool {
     return match_str("#'", input, pos);
@@ -483,6 +488,12 @@ fn special_subsequent(input: []const u8, pos: *usize) bool {
     return res;
 }
 
+test "quick" {
+    // var p: usize = 0;
+    // try std.testing.expect(number("#e28.000", &p));
+    // try std.testing.expectEqual(8, p);
+}
+
 fn number(input: []const u8, pos: *usize) bool {
     return (num(2, input, pos) or num(8, input, pos) or num(10, input, pos) or num(16, input, pos)) and delimiter_termination(input, pos.*);
 }
@@ -571,13 +582,13 @@ fn ureal(base: comptime_int, input: []const u8, pos: *usize) bool {
         return true;
     }
     p = pos.*;
-    // <uinteger R>
-    if (uinteger(base, input, &p)) {
+    if (base == 10 and decimal(base, input, &p) and mantissa_width(input, &p)) {
         pos.* = p;
         return true;
     }
     p = pos.*;
-    if (decimal(10, input, &p) and mantissa_width(input, &p)) {
+    // <uinteger R>
+    if (uinteger(base, input, &p)) {
         pos.* = p;
         return true;
     }
@@ -625,9 +636,12 @@ fn prefix(base: comptime_int, input: []const u8, pos: *usize) bool {
         pos.* = p;
         return true;
     }
-    _ = exactness(input, pos); // always returns true
-    _ = radix(base, input, pos); // optional
-    return true;
+    p = pos.*;
+    if (exactness(input, pos) and radix(base, input, pos)) {
+        pos.* = p;
+        return true;
+    }
+    return false;
 }
 fn suffix(input: []const u8, pos: *usize) bool {
     var p = pos.*;
@@ -675,12 +689,14 @@ fn radix(base: comptime_int, input: []const u8, pos: *usize) bool {
     const matched: bool = switch (base) {
         2 => match_char('#', input, &p) and match_any_char("bB", input, &p),
         8 => match_char('#', input, &p) and match_any_char("oO", input, &p),
-        10 => (match_char('#', input, &p) and match_any_char("dD", input, &p)) or true,
+        10 => match_char('#', input, &p) and match_any_char("dD", input, &p),
         16 => match_char('#', input, &p) and match_any_char("xX", input, &p),
         else => @compileError("invalid base! must be one of 2,8,10 or 16"),
     };
+    // if the radix matched we update the cursor
     if (matched) pos.* = p;
-    return matched;
+    // if the number is in base 10 the prefix is not needed.
+    return matched or base == 10;
 }
 
 fn digit(base: comptime_int, input: []const u8, pos: *usize) bool {
@@ -959,11 +975,12 @@ test suffix {
 }
 
 test prefix {
+    // exactness without prefix is only valid in base 10
+    try test_prod_base(prefix, 10, "#i", 2);
+    try test_prod_base(prefix, 10, "#I", 2);
+    try test_prod_base(prefix, 10, "#e", 2);
+    try test_prod_base(prefix, 10, "#E", 2);
     // base 2 prefixes
-    try test_prod_base(prefix, 2, "#i", 2);
-    try test_prod_base(prefix, 2, "#I", 2);
-    try test_prod_base(prefix, 2, "#e", 2);
-    try test_prod_base(prefix, 2, "#E", 2);
     try test_prod_base(prefix, 2, "#b", 2);
     try test_prod_base(prefix, 2, "#B", 2);
     try test_prod_base(prefix, 2, "#b#i", 4);
