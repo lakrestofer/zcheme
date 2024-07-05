@@ -1,8 +1,16 @@
-const std = @import("std");
-const testing = std.testing;
+pub const Sexpr = union(enum) {
+    Nil,
+    Cons: struct {
+        value: *Sexpr,
+        link: *Sexpr,
+    },
+    Number: union(enum) { float: f64, integer: i64 },
+    Identifier: struct { value: []u8 },
+    String: struct { value: []u8 },
+    Char: struct { value: u8 },
+    Boolean: struct { value: bool },
+};
 
-test "basic test" {
-    const Lexer = @import("lexer").Lexer;
-    var lexer = Lexer.init("()", .{});
-    std.debug.print("{any}", .{lexer.nextToken()});
+test {
+    _ = @import("./tests/test.zig");
 }
