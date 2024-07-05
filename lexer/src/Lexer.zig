@@ -502,55 +502,10 @@ fn num(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
 
     if (!prefix(base, input, &p)) return false;
-    if (!complex(base, input, &p)) return false;
+    if (!real(base, input, &p)) return false;
 
     pos.* = p;
     return true;
-}
-fn complex(base: comptime_int, input: []const u8, pos: *usize) bool {
-    var p = pos.*;
-    // <real R> @ <real R>
-    if (real(base, input, &p) and match_char('@', input, &p) and real(base, input, &p)) {
-        pos.* = p;
-        return true;
-    }
-    p = pos.*;
-    // <real R> + <ureal R> i
-    // <real R> - <ureal R> i
-    // <real R> + <naninf> i
-    // <real R> - <naninf> i
-    if (real(base, input, &p) and match_any_char("-+", input, &p) and (ureal(base, input, &p) or naninf(input, &p)) and match_char('i', input, &p)) {
-        pos.* = p;
-        return true;
-    }
-    p = pos.*;
-    // <real R> + i
-    // <real R> - i
-    if (real(base, input, &p) and match_any_char("-+", input, &p) and match_char('i', input, &p)) {
-        pos.* = p;
-        return true;
-    }
-    p = pos.*;
-    // <real R>
-    if (real(base, input, &p)) {
-        pos.* = p;
-        return true;
-    }
-    p = pos.*;
-    // + <ureal R> i
-    // - <ureal R> i
-    // + <naninf> i
-    // - <naninf> i
-    if (match_any_char("-+", input, &p) and (ureal(base, input, &p) or naninf(input, &p)) and match_char('i', input, &p)) {
-        pos.* = p;
-        return true;
-    }
-    if (match_any_char("-+", input, &p) and match_char('i', input, &p)) {
-        pos.* = p;
-        return true;
-    }
-
-    return false;
 }
 fn real(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
@@ -573,15 +528,6 @@ fn naninf(input: []const u8, pos: *usize) bool {
 fn ureal(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
 
-    // <uinteger R> / uinteger R>
-    if (uinteger(base, input, &p) and
-        match_char('/', input, &p) and
-        uinteger(base, input, &p))
-    {
-        pos.* = p;
-        return true;
-    }
-    p = pos.*;
     if (base == 10 and decimal(base, input, &p) and mantissa_width(input, &p)) {
         pos.* = p;
         return true;
