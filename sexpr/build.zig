@@ -6,20 +6,26 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // === build library ===
+    // build lexer
+    const lexer = b.dependency("lexer", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const lm = lexer.module("lexer");
+    // build sexpr library
     const lib = b.addStaticLibrary(.{
-        .name = "lexer",
+        .name = "sexpr",
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
+    lib.root_module.addImport("lexer", lm);
     b.installArtifact(lib);
-    // export this library to a consumer of the lexer package
-    _ = b.addModule("lexer", .{ .root_source_file = lib.root_module.root_source_file });
 
-    // === build lexer executable ===
-    // simple toy program that spits out sequence of tokens
+    // === build sexpr executable ===
+    // simple testing for spitting out sexprs
     const exe = b.addExecutable(.{
-        .name = "lexer",
+        .name = "sexpr",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
@@ -32,12 +38,13 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    lib_unit_tests.root_module.addImport("lexer", lm);
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     // === create commands ===
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
+    if (b.args) |args| run_cmd.addArgs(args); // `zig build run -- arg1 arg2 etc`
 
     // === steps ===
     // zig build run
