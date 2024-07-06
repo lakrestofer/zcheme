@@ -1,0 +1,19 @@
+.{
+    .name = "parser",
+    .version = "0.0.0",
+    .dependencies = .{
+        .lexer = .{
+            .path = "../lexer",
+            .lazy = false,
+        },
+        .sexpr = .{
+            .path = "../sexpr",
+            .lazy = false,
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

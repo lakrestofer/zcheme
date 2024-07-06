@@ -6,22 +6,27 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // === build library ===
-    // build lexer
     const lexer = b.dependency("lexer", .{
         .target = target,
         .optimize = optimize,
     });
+    const sexpr = b.dependency("sexpr", .{
+        .target = target,
+        .optimize = optimize,
+    });
     const lm = lexer.module("lexer");
-    // build sexpr library
+    const sm = sexpr.module("sexpr");
+    // build parser library
     const lib = b.addStaticLibrary(.{
-        .name = "sexpr",
+        .name = "parser",
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
     lib.root_module.addImport("lexer", lm);
+    lib.root_module.addImport("sexpr", sm);
     b.installArtifact(lib);
-    _ = b.addModule("sexpr", .{ .root_source_file = lib.root_module.root_source_file });
+    _ = b.addModule("parser", .{ .root_source_file = lib.root_module.root_source_file });
 
     // === build tests ===
     const lib_unit_tests = b.addTest(.{
@@ -30,6 +35,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     lib_unit_tests.root_module.addImport("lexer", lm);
+    lib_unit_tests.root_module.addImport("sexpr", sm);
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     // === steps ===
