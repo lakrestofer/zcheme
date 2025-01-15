@@ -3,10 +3,11 @@
 
   inputs = {
     zig2nix.url = "github:Cloudef/zig2nix";
+    zls.url = "github:zigtools/zls";
   };
 
   outputs =
-    { zig2nix, ... }:
+    { zig2nix, zls, ... }@inputs:
     let
       flake-utils = zig2nix.inputs.flake-utils;
     in
@@ -19,6 +20,7 @@
         env = zig2nix.outputs.zig-env.${system} {
           zig = zig2nix.outputs.packages.${system}.zig.master.bin;
         };
+        zlsPkg = zls.packages.${system}.default;
         system-triple = env.lib.zigTripleFromString system;
       in
       with builtins;
@@ -98,7 +100,11 @@
         apps.zon2nix = env.app [ env.zon2nix ] "zon2nix \"$@\"";
 
         # nix develop
-        devShells.default = env.mkShell { };
+        devShells.default = env.mkShell {
+          nativeBuildInputs = [
+            zlsPkg
+          ];
+        };
       }
     ));
 }
