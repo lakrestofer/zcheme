@@ -4,7 +4,7 @@ const test_prod = @import("./tests/lexer.zig").test_prod;
 
 // struct Lexer {
 input: []const u8,
-pos: usize = 0,
+p: usize = 0,
 //}
 
 pub const TokenKind = enum {
@@ -77,44 +77,44 @@ pub fn init(
 
 pub fn nextToken(self: *Self) ?Token {
     // consumes any whitespace or comments
-    _ = intertoken_space(self.input, &self.pos);
+    _ = intertoken_space(self.input, &self.p);
 
-    if (eof(self.input, &self.pos)) return null;
+    if (eof(self.input, &self.p)) return null;
 
-    const start = self.pos;
-    if (whitespace(self.input, &self.pos)) return Token.new(.whitespace, start, self.pos);
-    if (l_byte_vec_paren(self.input, &self.pos)) return Token.new(.l_byte_vec_paren, start, self.pos);
-    if (l_vec_paren(self.input, &self.pos)) return Token.new(.l_vec_paren, start, self.pos);
-    if (l_paren(self.input, &self.pos)) return Token.new(.l_paren, start, self.pos);
-    if (r_paren(self.input, &self.pos)) return Token.new(.r_paren, start, self.pos);
-    if (l_square_paren(self.input, &self.pos)) return Token.new(.l_square_paren, start, self.pos);
-    if (r_square_paren(self.input, &self.pos)) return Token.new(.r_square_paren, start, self.pos);
-    if (l_curly_paren(self.input, &self.pos)) return Token.new(.invalid, start, self.pos);
-    if (r_curly_paren(self.input, &self.pos)) return Token.new(.invalid, start, self.pos);
-    if (quasi_quote(self.input, &self.pos)) return Token.new(.quasi_quote, start, self.pos);
-    if (quote(self.input, &self.pos)) return Token.new(.quote, start, self.pos);
-    if (unquote_splicing(self.input, &self.pos)) return Token.new(.unquote_splicing, start, self.pos);
-    if (unquote(self.input, &self.pos)) return Token.new(.unquote, start, self.pos);
-    if (period(self.input, &self.pos)) return Token.new(.period, start, self.pos);
-    if (syntax(self.input, &self.pos)) return Token.new(.syntax, start, self.pos);
-    if (quasi_syntax(self.input, &self.pos)) return Token.new(.quasi_syntax, start, self.pos);
-    if (unsyntax_splicing(self.input, &self.pos)) return Token.new(.unsyntax_splicing, start, self.pos);
-    if (unsyntax(self.input, &self.pos)) return Token.new(.unsyntax, start, self.pos);
-    if (comment(self.input, &self.pos)) return Token.new(.comment, start, self.pos);
+    const start = self.p;
+    if (whitespace(self.input, &self.p)) return Token.new(.whitespace, start, self.p);
+    if (l_byte_vec_paren(self.input, &self.p)) return Token.new(.l_byte_vec_paren, start, self.p);
+    if (l_vec_paren(self.input, &self.p)) return Token.new(.l_vec_paren, start, self.p);
+    if (l_paren(self.input, &self.p)) return Token.new(.l_paren, start, self.p);
+    if (r_paren(self.input, &self.p)) return Token.new(.r_paren, start, self.p);
+    if (l_square_paren(self.input, &self.p)) return Token.new(.l_square_paren, start, self.p);
+    if (r_square_paren(self.input, &self.p)) return Token.new(.r_square_paren, start, self.p);
+    if (l_curly_paren(self.input, &self.p)) return Token.new(.invalid, start, self.p);
+    if (r_curly_paren(self.input, &self.p)) return Token.new(.invalid, start, self.p);
+    if (quasi_quote(self.input, &self.p)) return Token.new(.quasi_quote, start, self.p);
+    if (quote(self.input, &self.p)) return Token.new(.quote, start, self.p);
+    if (unquote_splicing(self.input, &self.p)) return Token.new(.unquote_splicing, start, self.p);
+    if (unquote(self.input, &self.p)) return Token.new(.unquote, start, self.p);
+    if (period(self.input, &self.p)) return Token.new(.period, start, self.p);
+    if (syntax(self.input, &self.p)) return Token.new(.syntax, start, self.p);
+    if (quasi_syntax(self.input, &self.p)) return Token.new(.quasi_syntax, start, self.p);
+    if (unsyntax_splicing(self.input, &self.p)) return Token.new(.unsyntax_splicing, start, self.p);
+    if (unsyntax(self.input, &self.p)) return Token.new(.unsyntax, start, self.p);
+    if (comment(self.input, &self.p)) return Token.new(.comment, start, self.p);
     // try to parse number before parsing identifier such that (+i, -i) gets interpreted as numbers
-    // if (float(self.input, &self.pos)) return Token.new(.float, start, self.pos);
-    // if (integer(self.input, &self.pos)) return Token.new(.float, start, self.pos);
-    if (number(self.input, &self.pos)) return Token.new(.number, start, self.pos);
-    if (identifier(self.input, &self.pos)) return Token.new(.identifier, start, self.pos);
-    if (boolean(self.input, &self.pos)) return Token.new(.boolean, start, self.pos);
-    if (character(self.input, &self.pos)) return Token.new(.character, start, self.pos);
-    if (string(self.input, &self.pos)) return Token.new(.string, start, self.pos);
+    // if (float(self.input, &self.p)) return Token.new(.float, start, self.p);
+    // if (integer(self.input, &self.p)) return Token.new(.float, start, self.p);
+    if (number(self.input, &self.p)) return Token.new(.number, start, self.p);
+    if (identifier(self.input, &self.p)) return Token.new(.identifier, start, self.p);
+    if (boolean(self.input, &self.p)) return Token.new(.boolean, start, self.p);
+    if (character(self.input, &self.p)) return Token.new(.character, start, self.p);
+    if (string(self.input, &self.p)) return Token.new(.string, start, self.p);
 
     // if we found not invalid pos we increment pos by one,
     // such that we still progress somehow
-    self.pos += 1;
+    self.p += 1;
 
-    return Token.new(.invalid, start, self.pos);
+    return Token.new(.invalid, start, self.p);
 }
 
 // === production rules begin ===
@@ -130,65 +130,65 @@ fn whitespace(input: []const u8, pos: *usize) bool {
 }
 
 fn l_paren(input: []const u8, pos: *usize) bool {
-    return match_char('(', input, pos);
+    return U.char('(', input, pos);
 }
 fn r_paren(input: []const u8, pos: *usize) bool {
-    return match_char(')', input, pos);
+    return U.char(')', input, pos);
 }
 fn l_square_paren(input: []const u8, pos: *usize) bool {
-    return match_char('[', input, pos);
+    return U.char('[', input, pos);
 }
 fn r_square_paren(input: []const u8, pos: *usize) bool {
-    return match_char(']', input, pos);
+    return U.char(']', input, pos);
 }
 fn l_curly_paren(input: []const u8, pos: *usize) bool {
-    return match_char('{', input, pos);
+    return U.char('{', input, pos);
 }
 fn r_curly_paren(input: []const u8, pos: *usize) bool {
-    return match_char('}', input, pos);
+    return U.char('}', input, pos);
 }
 fn l_vec_paren(input: []const u8, pos: *usize) bool {
-    return match_str("#(", input, pos);
+    return U.str("#(", input, pos);
 }
 fn l_byte_vec_paren(input: []const u8, pos: *usize) bool {
-    return match_str("#vu8(", input, pos);
+    return U.str("#vu8(", input, pos);
 }
 fn quote(input: []const u8, pos: *usize) bool {
-    return match_char('\'', input, pos);
+    return U.char('\'', input, pos);
 }
 fn quasi_quote(input: []const u8, pos: *usize) bool {
-    return match_char('`', input, pos);
+    return U.char('`', input, pos);
 }
 fn unquote(input: []const u8, pos: *usize) bool {
-    return match_char(',', input, pos);
+    return U.char(',', input, pos);
 }
 fn unquote_splicing(input: []const u8, pos: *usize) bool {
-    return match_str(",@", input, pos);
+    return U.str(",@", input, pos);
 }
 fn period(input: []const u8, pos: *usize) bool {
-    return match_char('.', input, pos);
+    return U.char('.', input, pos);
 }
 fn syntax(input: []const u8, pos: *usize) bool {
-    return match_str("#'", input, pos);
+    return U.str("#'", input, pos);
 }
 fn quasi_syntax(input: []const u8, pos: *usize) bool {
-    return match_str("#`", input, pos);
+    return U.str("#`", input, pos);
 }
 fn unsyntax(input: []const u8, pos: *usize) bool {
-    return match_str("#,", input, pos);
+    return U.str("#,", input, pos);
 }
 fn unsyntax_splicing(input: []const u8, pos: *usize) bool {
-    return match_str("#,@", input, pos);
+    return U.str("#,@", input, pos);
 }
 
 fn dubble_quote(input: []const u8, pos: *usize) bool {
-    return match_char('"', input, pos);
+    return U.char('"', input, pos);
 }
 fn semicolon(input: []const u8, pos: *usize) bool {
-    return match_char(';', input, pos);
+    return U.char(';', input, pos);
 }
 fn hashtag(input: []const u8, pos: *usize) bool {
-    return match_char('#', input, pos);
+    return U.char('#', input, pos);
 }
 
 fn line_ending(input: []const u8, pos: *usize) bool {
@@ -229,7 +229,7 @@ fn single_line_comment(input: []const u8, pos: *usize) bool {
 fn nested_comment(input: []const u8, pos: *usize) bool {
     var p = pos.*;
 
-    if (!match_str("#|", input, &p)) return false; // p += 1
+    if (!U.str("#|", input, &p)) return false; // p += 1
 
     // comment text
     while (p < input.len - 1 and
@@ -252,7 +252,7 @@ fn nested_comment(input: []const u8, pos: *usize) bool {
         p += 1;
     }
 
-    if (!match_str("|#", input, &p)) return false;
+    if (!U.str("|#", input, &p)) return false;
 
     // having successfully parsed the comment
     // we update the cursor position of the caller
@@ -292,10 +292,10 @@ fn identifier(input: []const u8, pos: *usize) bool {
 }
 
 fn boolean(input: []const u8, pos: *usize) bool {
-    return match_str("#t", input, pos) or
-        match_str("#T", input, pos) or
-        match_str("#f", input, pos) or
-        match_str("#F", input, pos);
+    return U.str("#t", input, pos) or
+        U.str("#T", input, pos) or
+        U.str("#f", input, pos) or
+        U.str("#F", input, pos);
 }
 
 const CHARACTER_NAMES: [12][]const u8 = .{
@@ -305,14 +305,14 @@ fn character(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // p_diff = 0
     // #\
-    if (!match_str("#\\", input, &p)) return false;
+    if (!U.str("#\\", input, &p)) return false;
     // p_diff = 2
 
     // #\character_name
     // if (terminal_string("nul", input, &p)) ...
     // if (terminal_string("alarm", input, &p)) ...
     inline for (CHARACTER_NAMES) |name| {
-        if (match_str(name, input, &p)) {
+        if (U.str(name, input, &p)) {
             pos.* = p;
             return true;
         }
@@ -337,17 +337,17 @@ fn character(input: []const u8, pos: *usize) bool {
 }
 
 fn string(input: []const u8, pos: *usize) bool {
-    if (!match_str("\"", input, pos)) return false;
+    if (!U.str("\"", input, pos)) return false;
 
     while (pos.* < input.len and string_element(input, pos)) {}
 
-    if (!match_str("\"", input, pos)) return false;
+    if (!U.str("\"", input, pos)) return false;
 
     return true;
 }
 
 fn intraline_whitespace(input: []const u8, pos: *usize) bool {
-    return match_str("\t", input, pos) or match_str(" ", input, pos);
+    return U.str("\t", input, pos) or U.str(" ", input, pos);
 }
 
 fn string_element(input: []const u8, pos: *usize) bool {
@@ -355,17 +355,17 @@ fn string_element(input: []const u8, pos: *usize) bool {
 
     // check for some correct usages of '\'
     if ((inline_hex_escape(input, pos) or
-        match_str("\\\t", input, pos) or // intraline_whitespace rule
-        match_str("\\ ", input, pos) or // intraline_whitespace rule
-        match_str("\\a", input, pos) or
-        match_str("\\b", input, pos) or
-        match_str("\\t", input, pos) or
-        match_str("\\n", input, pos) or
-        match_str("\\v", input, pos) or
-        match_str("\\f", input, pos) or
-        match_str("\\r", input, pos) or
-        match_str("\\\"", input, pos) or
-        match_str("\\\\", input, pos))) return true;
+        U.str("\\\t", input, pos) or // intraline_whitespace rule
+        U.str("\\ ", input, pos) or // intraline_whitespace rule
+        U.str("\\a", input, pos) or
+        U.str("\\b", input, pos) or
+        U.str("\\t", input, pos) or
+        U.str("\\n", input, pos) or
+        U.str("\\v", input, pos) or
+        U.str("\\f", input, pos) or
+        U.str("\\r", input, pos) or
+        U.str("\\\"", input, pos) or
+        U.str("\\\\", input, pos))) return true;
 
     if (input[pos.*] == '\\') return false;
 
@@ -409,9 +409,9 @@ fn constituent(input: []const u8, pos: *usize) bool {
 
 fn inline_hex_escape(input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    if (!match_str("\\x", input, &p)) return false;
+    if (!U.str("\\x", input, &p)) return false;
     if (!hex_scalar_value(input, &p)) return false;
-    if (!match_str(";", input, &p)) return false;
+    if (!U.str(";", input, &p)) return false;
     pos.* = p;
     return true;
 }
@@ -479,10 +479,10 @@ fn peculiar_identifier(input: []const u8, pos: *usize) bool {
 }
 
 fn digit10(input: []const u8, pos: *usize) bool {
-    return match_any_char("0123456789", input, pos);
+    return U.any_char("0123456789", input, pos);
 }
 fn special_subsequent(input: []const u8, pos: *usize) bool {
-    return match_any_char("+-.@", input, pos);
+    return U.any_char("+-.@", input, pos);
 }
 
 test "quick" {
@@ -495,75 +495,75 @@ test "quick" {
 fn float(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // "0x" hex_int "." hex_int ([pP] [-+]? dec_int)? skip
-    if (match_str("0x", input, &p) and
+    if (U.str("0x", input, &p) and
         hex_int(input, &p) and
-        match_char('.', input, &p) and
+        U.char('.', input, &p) and
         hex_int(input, &p))
     {
         var p2 = p;
-        if (match_any_char("pP", input, &p2) and
-            (match_any_char("-+", input, &p2) or true) and
+        if (U.any_char("pP", input, &p2) and
+            (U.any_char("-+", input, &p2) or true) and
             dec_int(input, &p2))
         {
             p = p2;
         }
-        if (delimiter_termination(input, p)) return matched(pos, p);
+        if (delimiter_termination(input, p)) return U.matched(pos, p);
     }
     p = pos.*;
     // dec_int "." dec_int ([eE] [-+]? dec_int)? skip
     if (dec_int(input, &p) and
-        match_char('.', input, &p) and
+        U.char('.', input, &p) and
         dec_int(input, &p))
     {
         var p2 = p;
-        if (match_any_char("eE", input, &p2) and
-            (match_any_char("-+", input, &p2) or true) and
+        if (U.any_char("eE", input, &p2) and
+            (U.any_char("-+", input, &p2) or true) and
             dec_int(input, &p2))
         {
             p = p2;
         }
-        if (delimiter_termination(input, p)) return matched(pos, p);
+        if (delimiter_termination(input, p)) return U.matched(pos, p);
     }
     p = pos.*;
     // "0x" hex_int [pP] [-+]? dec_int skip
-    if (match_str("0x", input, &p) and
+    if (U.str("0x", input, &p) and
         hex_int(input, &p) and
-        match_any_char("pP", input, &p) and
-        (match_any_char("-+", input, &p) or true) and
+        U.any_char("pP", input, &p) and
+        (U.any_char("-+", input, &p) or true) and
         dec_int(input, &p) and
         delimiter_termination(input, p))
-        return matched(pos, p);
+        return U.matched(pos, p);
     p = pos.*;
     //  dec_int [eE] [-+]? dec_int skip
     if (dec_int(input, &p) and
-        match_any_char("eE", input, &p) and
-        (match_any_char("-+", input, &p) or true) and
+        U.any_char("eE", input, &p) and
+        (U.any_char("-+", input, &p) or true) and
         dec_int(input, &p) and
         delimiter_termination(input, p))
-        return matched(pos, p);
+        return U.matched(pos, p);
     return false;
 }
 
 fn integer(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // "0b" bin_int skip
-    if (match_str("0b", input, &p) and bin_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    if (U.str("0b", input, &p) and bin_int(input, &p) and delimiter_termination(input, &p)) return U.matched(pos, p);
     p = pos.*;
     // "0o" oct_int skip
-    if (match_str("0o", input, &p) and oct_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    if (U.str("0o", input, &p) and oct_int(input, &p) and delimiter_termination(input, &p)) return U.matched(pos, p);
     p = pos.*;
     // "0x" hex_int skip
-    if (match_str("0o", input, &p) and oct_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    if (U.str("0o", input, &p) and oct_int(input, &p) and delimiter_termination(input, &p)) return U.matched(pos, p);
     p = pos.*;
     // dec_int   skip
-    if (dec_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    if (dec_int(input, &p) and delimiter_termination(input, &p)) return U.matched(pos, p);
     return false;
 }
 fn hex_int(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     if (hex(input, &p)) {
         while (_hex(input, &p)) {}
-        return matched(pos, p);
+        return U.matched(pos, p);
     }
     return false;
 }
@@ -571,7 +571,7 @@ fn dec_int(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     if (dec(input, &p)) {
         while (_dec(input, &p)) {}
-        return matched(pos, p);
+        return U.matched(pos, p);
     }
     return false;
 }
@@ -579,7 +579,7 @@ fn bin_int(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     if (bin(input, &p)) {
         while (_bin(input, &p)) {}
-        return matched(pos, p);
+        return U.matched(pos, p);
     }
     return false;
 }
@@ -587,44 +587,44 @@ fn oct_int(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     if (oct(input, &p)) {
         while (_oct(input, &p)) {}
-        return matched(pos, p);
+        return U.matched(pos, p);
     }
     return false;
 }
 fn hex(input: []const u8, pos: *usize) bool {
-    return match_any_char("0123456789abcdefABCDEF", input, pos);
+    return U.any_char("0123456789abcdefABCDEF", input, pos);
 }
 fn _hex(input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    _ = match_char('_', input, &p);
-    if (hex(input, &p)) return matched(pos, p);
+    _ = U.char('_', input, &p);
+    if (hex(input, &p)) return U.matched(pos, p);
     return false;
 }
 fn dec(input: []const u8, pos: *usize) bool {
-    return match_any_char("0123456789", input, pos);
+    return U.any_char("0123456789", input, pos);
 }
 fn _dec(input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    _ = match_char('_', input, &p);
-    if (dec(input, &p)) return matched(pos, p);
+    _ = U.char('_', input, &p);
+    if (dec(input, &p)) return U.matched(pos, p);
     return false;
 }
 fn bin(input: []const u8, pos: *usize) bool {
-    return match_any_char("01", input, pos);
+    return U.any_char("01", input, pos);
 }
 fn _bin(input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    _ = match_char('_', input, &p);
-    if (bin(input, &p)) return matched(pos, p);
+    _ = U.char('_', input, &p);
+    if (bin(input, &p)) return U.matched(pos, p);
     return false;
 }
 fn oct(input: []const u8, pos: *usize) bool {
-    return match_any_char("0123456", input, pos);
+    return U.any_char("0123456", input, pos);
 }
 fn _oct(input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    _ = match_char('_', input, &p);
-    if (oct(input, &p)) return matched(pos, p);
+    _ = U.char('_', input, &p);
+    if (oct(input, &p)) return U.matched(pos, p);
     return false;
 }
 
@@ -648,7 +648,7 @@ fn real(base: comptime_int, input: []const u8, pos: *usize) bool {
         return true;
     }
     p = pos.*;
-    if (match_char('+', input, &p) or match_char('-', input, &p)) {
+    if (U.char('+', input, &p) or U.char('-', input, &p)) {
         if (naninf(input, &p)) {
             pos.* = p;
             return true;
@@ -657,7 +657,7 @@ fn real(base: comptime_int, input: []const u8, pos: *usize) bool {
     return false;
 }
 fn naninf(input: []const u8, pos: *usize) bool {
-    return match_str("nan.0", input, pos) or match_str("inf.0", input, pos);
+    return U.str("nan.0", input, pos) or U.str("inf.0", input, pos);
 }
 fn ureal(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
@@ -679,7 +679,7 @@ fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
 
     var p = pos.*;
     // <digit 10>+ . <digit 10>* suffix
-    if (uinteger(10, input, &p) and match_char('.', input, &p)) {
+    if (uinteger(10, input, &p) and U.char('.', input, &p)) {
         _ = uinteger(10, input, &p); // optional
         if (suffix(input, &p)) {
             pos.* = p;
@@ -695,7 +695,7 @@ fn decimal(base: comptime_int, input: []const u8, pos: *usize) bool {
     }
     p = pos.*;
     // . <digit 10>+ suffix
-    if (match_char('.', input, &p) and uinteger(10, input, &p) and suffix(input, &p)) {
+    if (U.char('.', input, &p) and uinteger(10, input, &p) and suffix(input, &p)) {
         pos.* = p;
         return true;
     }
@@ -734,12 +734,12 @@ fn suffix(input: []const u8, pos: *usize) bool {
     return true;
 }
 fn exponent_marker(input: []const u8, pos: *usize) bool {
-    return match_any_char("eEsSfFdDlL", input, pos);
+    return U.any_char("eEsSfFdDlL", input, pos);
 }
 fn mantissa_width(input: []const u8, pos: *usize) bool {
     var p = pos.*;
     // | <uinteger 10>
-    if (match_char('|', input, &p) and uinteger(10, input, &p)) {
+    if (U.char('|', input, &p) and uinteger(10, input, &p)) {
         pos.* = p;
         return true;
     }
@@ -748,14 +748,14 @@ fn mantissa_width(input: []const u8, pos: *usize) bool {
 }
 fn sign(input: []const u8, pos: *usize) bool {
     // optional + or -
-    _ = match_any_char("+-", input, pos);
+    _ = U.any_char("+-", input, pos);
     return true;
 }
 fn exactness(input: []const u8, pos: *usize) bool {
     var p = pos.*;
 
-    if (match_char('#', input, &p)) {
-        if (match_any_char("iIeE", input, &p)) {
+    if (U.char('#', input, &p)) {
+        if (U.any_char("iIeE", input, &p)) {
             pos.* = p;
             return true;
         }
@@ -766,23 +766,23 @@ fn exactness(input: []const u8, pos: *usize) bool {
 }
 fn radix(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    const matched_: bool = switch (base) {
-        2 => match_char('#', input, &p) and match_any_char("bB", input, &p),
-        8 => match_char('#', input, &p) and match_any_char("oO", input, &p),
-        10 => match_char('#', input, &p) and match_any_char("dD", input, &p),
-        16 => match_char('#', input, &p) and match_any_char("xX", input, &p),
+    const matched: bool = switch (base) {
+        2 => U.char('#', input, &p) and U.any_char("bB", input, &p),
+        8 => U.char('#', input, &p) and U.any_char("oO", input, &p),
+        10 => U.char('#', input, &p) and U.any_char("dD", input, &p),
+        16 => U.char('#', input, &p) and U.any_char("xX", input, &p),
         else => @compileError("invalid base! must be one of 2,8,10 or 16"),
     };
-    // if the radix matched we update the cursor
-    if (matched_) pos.* = p;
+    // if the radix U.matched we update the cursor
+    if (matched) pos.* = p;
     // if the number is in base 10 the prefix is not needed.
-    return matched_ or base == 10;
+    return matched or base == 10;
 }
 
 fn digit(base: comptime_int, input: []const u8, pos: *usize) bool {
     switch (base) {
-        2 => return match_any_char("01", input, pos),
-        8 => return match_any_char("01234567", input, pos),
+        2 => return U.any_char("01", input, pos),
+        8 => return U.any_char("01234567", input, pos),
         10 => return digit10(input, pos),
         16 => return hex_digit(input, pos),
         else => @compileError("invalid base! must be one of 2,8,10 or 16"),
@@ -792,42 +792,44 @@ fn digit(base: comptime_int, input: []const u8, pos: *usize) bool {
 // === production rules end===
 
 // utils
-inline fn match_str(comptime expected: []const u8, input: []const u8, pos: *usize) bool {
-    if (pos.* >= input.len) return false;
+const U = struct {
+    inline fn str(comptime expected: []const u8, input: []const u8, pos: *usize) bool {
+        if (pos.* >= input.len) return false;
 
-    if (std.mem.startsWith(u8, input[pos.*..], expected)) {
-        pos.* += expected.len;
-        return true;
+        if (std.mem.startsWith(u8, input[pos.*..], expected)) {
+            pos.* += expected.len;
+            return true;
+        }
+        return false;
     }
-    return false;
-}
-// match the provided char `char` only
-inline fn match_char(comptime char: u8, input: []const u8, pos: *usize) bool {
-    if (pos.* >= input.len) return false;
+    // match the provided char `char` only
+    inline fn char(comptime c: u8, input: []const u8, pos: *usize) bool {
+        if (pos.* >= input.len) return false;
 
-    if (pos.* < input.len and char == input[pos.*]) {
-        pos.* += 1;
-        return true;
-    }
-    return false;
-}
-// match any of the chars in the set `chars`
-inline fn match_any_char(comptime chars: []const u8, input: []const u8, pos: *usize) bool {
-    if (pos.* >= input.len) return false;
-
-    const c = input[pos.*];
-    for (chars) |char| {
-        if (char == c) {
+        if (pos.* < input.len and c == input[pos.*]) {
             pos.* += 1;
             return true;
         }
+        return false;
     }
-    return false;
-}
-inline fn matched(p: *usize, new_p: usize) bool {
-    p.* = new_p;
-    return true;
-}
+    // match any of the chars in the set `chars`
+    inline fn any_char(comptime chars: []const u8, input: []const u8, pos: *usize) bool {
+        if (pos.* >= input.len) return false;
+
+        const c = input[pos.*];
+        for (chars) |c_| {
+            if (c_ == c) {
+                pos.* += 1;
+                return true;
+            }
+        }
+        return false;
+    }
+    inline fn matched(p: *usize, new_p: usize) bool {
+        p.* = new_p;
+        return true;
+    }
+};
 
 test line_ending {
     try test_prod(line_ending, "\r\n", 2);
