@@ -13,6 +13,8 @@ pub const TokenKind = enum {
     boolean,
     character,
     string,
+    integer,
+    float,
     number,
     l_paren, // (
     r_paren, // )
@@ -100,6 +102,8 @@ pub fn nextToken(self: *Self) ?Token {
     if (unsyntax(self.input, &self.pos)) return Token.new(.unsyntax, start, self.pos);
     if (comment(self.input, &self.pos)) return Token.new(.comment, start, self.pos);
     // try to parse number before parsing identifier such that (+i, -i) gets interpreted as numbers
+    // if (float(self.input, &self.pos)) return Token.new(.float, start, self.pos);
+    // if (integer(self.input, &self.pos)) return Token.new(.float, start, self.pos);
     if (number(self.input, &self.pos)) return Token.new(.number, start, self.pos);
     if (identifier(self.input, &self.pos)) return Token.new(.identifier, start, self.pos);
     if (boolean(self.input, &self.pos)) return Token.new(.boolean, start, self.pos);
@@ -475,25 +479,153 @@ fn peculiar_identifier(input: []const u8, pos: *usize) bool {
 }
 
 fn digit10(input: []const u8, pos: *usize) bool {
-    if (pos.* >= input.len or !std.ascii.isDigit(input[pos.*])) return false;
-    pos.* += 1;
-    return true;
+    return match_any_char("0123456789", input, pos);
 }
 fn special_subsequent(input: []const u8, pos: *usize) bool {
-    const res = input[pos.*] == '+' or
-        input[pos.*] == '-' or
-        input[pos.*] == '.' or
-        input[pos.*] == '@';
-
-    if (res) pos.* += 1;
-
-    return res;
+    return match_any_char("+-.@", input, pos);
 }
 
 test "quick" {
     // var p: usize = 0;
     // try std.testing.expect(number("#e28.000", &p));
     // try std.testing.expectEqual(8, p);
+}
+
+// floating point syntax from
+fn float(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    // "0x" hex_int "." hex_int ([pP] [-+]? dec_int)? skip
+    if (match_str("0x", input, &p) and
+        hex_int(input, &p) and
+        match_char('.', input, &p) and
+        hex_int(input, &p))
+    {
+        var p2 = p;
+        if (match_any_char("pP", input, &p2) and
+            (match_any_char("-+", input, &p2) or true) and
+            dec_int(input, &p2))
+        {
+            p = p2;
+        }
+        if (delimiter_termination(input, p)) return matched(pos, p);
+    }
+    p = pos.*;
+    // dec_int "." dec_int ([eE] [-+]? dec_int)? skip
+    if (dec_int(input, &p) and
+        match_char('.', input, &p) and
+        dec_int(input, &p))
+    {
+        var p2 = p;
+        if (match_any_char("eE", input, &p2) and
+            (match_any_char("-+", input, &p2) or true) and
+            dec_int(input, &p2))
+        {
+            p = p2;
+        }
+        if (delimiter_termination(input, p)) return matched(pos, p);
+    }
+    p = pos.*;
+    // "0x" hex_int [pP] [-+]? dec_int skip
+    if (match_str("0x", input, &p) and
+        hex_int(input, &p) and
+        match_any_char("pP", input, &p) and
+        (match_any_char("-+", input, &p) or true) and
+        dec_int(input, &p) and
+        delimiter_termination(input, p))
+        return matched(pos, p);
+    p = pos.*;
+    //  dec_int [eE] [-+]? dec_int skip
+    if (dec_int(input, &p) and
+        match_any_char("eE", input, &p) and
+        (match_any_char("-+", input, &p) or true) and
+        dec_int(input, &p) and
+        delimiter_termination(input, p))
+        return matched(pos, p);
+    return false;
+}
+
+fn integer(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    // "0b" bin_int skip
+    if (match_str("0b", input, &p) and bin_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    p = pos.*;
+    // "0o" oct_int skip
+    if (match_str("0o", input, &p) and oct_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    p = pos.*;
+    // "0x" hex_int skip
+    if (match_str("0o", input, &p) and oct_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    p = pos.*;
+    // dec_int   skip
+    if (dec_int(input, &p) and delimiter_termination(input, &p)) return matched(pos, p);
+    return false;
+}
+fn hex_int(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    if (hex(input, &p)) {
+        while (_hex(input, &p)) {}
+        return matched(pos, p);
+    }
+    return false;
+}
+fn dec_int(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    if (dec(input, &p)) {
+        while (_dec(input, &p)) {}
+        return matched(pos, p);
+    }
+    return false;
+}
+fn bin_int(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    if (bin(input, &p)) {
+        while (_bin(input, &p)) {}
+        return matched(pos, p);
+    }
+    return false;
+}
+fn oct_int(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    if (oct(input, &p)) {
+        while (_oct(input, &p)) {}
+        return matched(pos, p);
+    }
+    return false;
+}
+fn hex(input: []const u8, pos: *usize) bool {
+    return match_any_char("0123456789abcdefABCDEF", input, pos);
+}
+fn _hex(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    _ = match_char('_', input, &p);
+    if (hex(input, &p)) return matched(pos, p);
+    return false;
+}
+fn dec(input: []const u8, pos: *usize) bool {
+    return match_any_char("0123456789", input, pos);
+}
+fn _dec(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    _ = match_char('_', input, &p);
+    if (dec(input, &p)) return matched(pos, p);
+    return false;
+}
+fn bin(input: []const u8, pos: *usize) bool {
+    return match_any_char("01", input, pos);
+}
+fn _bin(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    _ = match_char('_', input, &p);
+    if (bin(input, &p)) return matched(pos, p);
+    return false;
+}
+fn oct(input: []const u8, pos: *usize) bool {
+    return match_any_char("0123456", input, pos);
+}
+fn _oct(input: []const u8, pos: *usize) bool {
+    var p = pos.*;
+    _ = match_char('_', input, &p);
+    if (oct(input, &p)) return matched(pos, p);
+    return false;
 }
 
 fn number(input: []const u8, pos: *usize) bool {
@@ -634,7 +766,7 @@ fn exactness(input: []const u8, pos: *usize) bool {
 }
 fn radix(base: comptime_int, input: []const u8, pos: *usize) bool {
     var p = pos.*;
-    const matched: bool = switch (base) {
+    const matched_: bool = switch (base) {
         2 => match_char('#', input, &p) and match_any_char("bB", input, &p),
         8 => match_char('#', input, &p) and match_any_char("oO", input, &p),
         10 => match_char('#', input, &p) and match_any_char("dD", input, &p),
@@ -642,9 +774,9 @@ fn radix(base: comptime_int, input: []const u8, pos: *usize) bool {
         else => @compileError("invalid base! must be one of 2,8,10 or 16"),
     };
     // if the radix matched we update the cursor
-    if (matched) pos.* = p;
+    if (matched_) pos.* = p;
     // if the number is in base 10 the prefix is not needed.
-    return matched or base == 10;
+    return matched_ or base == 10;
 }
 
 fn digit(base: comptime_int, input: []const u8, pos: *usize) bool {
@@ -691,6 +823,10 @@ inline fn match_any_char(comptime chars: []const u8, input: []const u8, pos: *us
         }
     }
     return false;
+}
+inline fn matched(p: *usize, new_p: usize) bool {
+    p.* = new_p;
+    return true;
 }
 
 test line_ending {
