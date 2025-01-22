@@ -48,6 +48,21 @@ pub const Token = struct {
             .end = end,
         };
     }
+
+    pub fn format(
+        self: Token,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print(
+            "Token {{ .kind = {}, .start = {}, .end = {} }}",
+            .{ self.kind, self.start, self.end },
+        );
+    }
 };
 
 const Self = @This();
