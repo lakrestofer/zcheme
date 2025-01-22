@@ -58,9 +58,10 @@ comptime {
 fn testFile(comptime name: []const u8) !void {
     const cwd = std.fs.cwd();
     const in = try cwd.readFileAlloc(ta, std.fmt.comptimePrint("tests/{s}", .{name}), 1048576);
-    const tokens_expected = try cwd.readFileAlloc(ta, std.fmt.comptimePrint("tests/tokens_expected_{s}", .{name}), 1048576);
-    const tokens_actual = try cwd.createFile(std.fmt.comptimePrint("tests/tokens_actual_{s}", .{name}), .{});
+    const tokens_expected = try cwd.readFileAlloc(ta, std.fmt.comptimePrint("tests/{s}.tokens.expected", .{name}), 1048576);
+    const tokens_actual = try cwd.createFile(std.fmt.comptimePrint("tests/{s}.tokens.actual", .{name}), .{});
     defer tokens_actual.close();
+
     defer ta.free(in);
     defer ta.free(tokens_expected);
 
