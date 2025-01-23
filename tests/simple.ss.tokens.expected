@@ -5,9 +5,9 @@ Token { .kind = Lexer.TokenKind.identifier, .start = 10, .end = 11 }
 Token { .kind = Lexer.TokenKind.identifier, .start = 12, .end = 14 }
 Token { .kind = Lexer.TokenKind.quote, .start = 15, .end = 16 }
 Token { .kind = Lexer.TokenKind.l_paren, .start = 16, .end = 17 }
-Token { .kind = Lexer.TokenKind.number, .start = 17, .end = 18 }
-Token { .kind = Lexer.TokenKind.number, .start = 19, .end = 20 }
-Token { .kind = Lexer.TokenKind.number, .start = 21, .end = 22 }
+Token { .kind = Lexer.TokenKind.integer, .start = 17, .end = 18 }
+Token { .kind = Lexer.TokenKind.integer, .start = 19, .end = 20 }
+Token { .kind = Lexer.TokenKind.integer, .start = 21, .end = 22 }
 Token { .kind = Lexer.TokenKind.r_paren, .start = 22, .end = 23 }
 Token { .kind = Lexer.TokenKind.identifier, .start = 30, .end = 32 }
 Token { .kind = Lexer.TokenKind.l_paren, .start = 33, .end = 34 }
