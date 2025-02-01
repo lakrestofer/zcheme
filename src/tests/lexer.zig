@@ -42,19 +42,6 @@ fn fuzz_lexer(input: []const u8) anyerror!void {
     while (lexer.nextToken()) |t| try actual.append(t.kind);
 }
 
-comptime {
-    // we generate test cases for each sample test file
-    for ([_][]const u8{
-        "simple.ss",
-    }) |name| {
-        _ = struct {
-            test {
-                try testFile(name);
-            }
-        };
-    }
-}
-
 fn testFile(comptime name: []const u8) !void {
     const cwd = std.fs.cwd();
     const in = try cwd.readFileAlloc(ta, std.fmt.comptimePrint("tests/{s}", .{name}), 1048576);
@@ -74,6 +61,19 @@ fn testFile(comptime name: []const u8) !void {
     try tokens_actual.writer().writeAll(tokens_str.items);
 
     try std.testing.expectEqualSlices(u8, tokens_expected, tokens_str.items);
+}
+
+comptime {
+    // we generate test cases for each sample test file
+    for ([_][]const u8{
+        "simple.ss",
+    }) |name| {
+        _ = struct {
+            test {
+                try testFile(name);
+            }
+        };
+    }
 }
 
 test "fuzzing" {

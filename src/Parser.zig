@@ -25,6 +25,29 @@ pub const Sexpr = union(SexprKind) {
     character: u8,
     boolean: bool,
 
+    pub fn format(
+        self: Sexpr,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+
+        switch (self) {
+            .nil => writer.print("Nil", .{}),
+            .cons => |c| {
+                writer.print("Cons {{ {}, {} }}", .{ c.value, c.next });
+            },
+            .integer => |i| writer.print("Int {{ {} }}", .{i}),
+            .float => |f| writer.print("Float {{ {} }}", .{f}),
+            .string => |s| writer.print("String {{ {} }}", .{s}),
+            .character => |c| writer.print("Char {{ {} }}", .{c}),
+            .boolean => |b| writer.print("Bool {{ {} }}", .{b}),
+            else => @panic("format not implemented for sexpr kind"),
+        }
+    }
+
     pub const Factory = struct {
         pub fn nil() Sexpr {
             return .nil;
@@ -83,7 +106,7 @@ fn datum(self: *Self) !?*Sexpr {
     // we have the lexeme datums
     if (try self.boolean()) |s| return s;
     if (try self.integer()) |s| return s;
-    // if (try self.float()) |s| return s;
+    if (try self.float()) |s| return s;
     // if (try self.char()) |s| return s;
     // if (try self.string()) |s| return s;
     // if (try self.symbol()) |s| return s;
@@ -121,7 +144,7 @@ fn integer(self: *Self) !?*Sexpr {
 fn float(self: *Self) !?*Sexpr {
     var p = self.pos;
     if (self.expect(TokenKind.float, &p)) |t| {
-        const value: f64 = std.fmt.parseFloat(f64, self.input[t.start..t.end], 0) catch @panic("could not parse integer token as i64");
+        const value: f64 = std.fmt.parseFloat(f64, self.input[t.start..t.end]) catch @panic("could not parse integer token as i64");
         const expr: *Sexpr = try self.arena.create(Sexpr);
         expr.* = Sexpr{ .float = value };
         self.pos = p;
@@ -173,61 +196,28 @@ fn char(self: *Self) !?*Sexpr {
     return null;
 }
 fn string(self: *Self) !?*Sexpr {
-    var p = self.pos;
-    if (self.expect(.integer, &p)) |t| {
-        const value: i64 = std.fmt.parseInt(i64, self.input[t.start..t.end], 0) catch @panic("could not parse integer token as i64");
-        const expr: *Sexpr = try self.arena.create(Sexpr);
-        expr.integer = value;
-        self.pos = p;
-        return expr;
-    }
+    _ = self; // autofix
     return null;
 }
 fn symbol(self: *Self) !?*Sexpr {
-    var p = self.pos;
-    if (self.expect(.integer, &p)) |t| {
-        const value: i64 = std.fmt.parseInt(i64, self.input[t.start..t.end], 0) catch @panic("could not parse integer token as i64");
-        const expr: *Sexpr = try self.arena.create(Sexpr);
-        expr.integer = value;
-        self.pos = p;
-        return expr;
-    }
+    _ = self; // autofix
     return null;
 }
 
 fn list(self: *Self) !?*Sexpr {
-    var p = self.pos;
-    if (self.expect(.integer, &p)) |t| {
-        const value: i64 = std.fmt.parseInt(i64, self.input[t.start..t.end], 0) catch @panic("could not parse integer token as i64");
-        const expr: *Sexpr = try self.arena.create(Sexpr);
-        expr.integer = value;
-        self.pos = p;
-        return expr;
-    }
+    _ = self; // autofix
     return null;
 }
 fn vector(self: *Self) !?*Sexpr {
-    var p = self.pos;
-    if (self.expect(.integer, &p)) |t| {
-        const value: i64 = std.fmt.parseInt(i64, self.input[t.start..t.end], 0) catch @panic("could not parse integer token as i64");
-        const expr: *Sexpr = try self.arena.create(Sexpr);
-        expr.integer = value;
-        self.pos = p;
-        return expr;
-    }
+    _ = self; // autofix
     return null;
 }
 fn byte_vector(self: *Self) !?*Sexpr {
-    var p = self.pos;
-    if (self.expect(.integer, &p)) |t| {
-        const value: i64 = std.fmt.parseInt(i64, self.input[t.start..t.end], 0) catch @panic("could not parse integer token as i64");
-        const expr: *Sexpr = try self.arena.create(Sexpr);
-        expr.integer = value;
-        self.pos = p;
-        return expr;
-    }
+    _ = self; // autofix
     return null;
 }
+
+// utils
 
 fn expect(self: *Self, expected: TokenKind, pos: *usize) ?*const Token {
     if (self.tokens.len <= pos.*) return null;
@@ -244,49 +234,4 @@ fn expectSequence(self: *Self, expected: []const TokenKind, pos: *usize) bool {
     // otherwise we have a match!, and we progress the cursor
     pos.* += expected.len;
     return true;
-}
-
-const ta = std.testing.allocator;
-
-fn test_parser(input: []const u8, expected: []const Sexpr) !void {
-    var arena = Arena.init(ta);
-    defer arena.deinit();
-
-    var lexer = Lexer.init(input);
-    var tokens = ArrayList(Token).init(arena.allocator());
-    while (lexer.nextToken()) |t| try tokens.append(t);
-
-    var parser = Self.init(input, tokens.items, arena.allocator());
-    var sexprs = ArrayList(*Sexpr).init(arena.allocator());
-    while (try parser.nextSexpr()) |e| try sexprs.append(e);
-    try std.testing.expectEqual(sexprs.items.len, expected.len);
-
-    for (sexprs.items, expected) |e, e2| {
-        try std.testing.expect(std.meta.eql(e.*, e2));
-    }
-}
-
-const Factory = Sexpr.Factory;
-test boolean {
-    try test_parser("#t #T #f #F", &[_]Sexpr{
-        Factory.boolean(true),
-        Factory.boolean(true),
-        Factory.boolean(false),
-        Factory.boolean(false),
-    });
-}
-test integer {
-    try test_parser(
-        "98222 0xff 0xFF 0o755 0b11110000 1_000_000_000 0b1_1111_1111 0o7_5_5",
-        &[_]Sexpr{
-            Factory.integer(98222),
-            Factory.integer(0xff),
-            Factory.integer(0xFF),
-            Factory.integer(0o755),
-            Factory.integer(0b11110000),
-            Factory.integer(1_000_000_000),
-            Factory.integer(0b1_1111_1111),
-            Factory.integer(0o7_5_5),
-        },
-    );
 }
