@@ -105,7 +105,7 @@ pub fn nextToken(self: *Self) ?Token {
     if (character(self.input, &self.p)) return Token.new(.character, start, self.p);
     if (string(self.input, &self.p)) return Token.new(.string, start, self.p);
 
-    // if we found not invalid pos we increment pos by one,
+    // if we found no valid token we increment pos by one,
     // such that we still progress somehow
     self.p += 1;
 
@@ -300,18 +300,16 @@ fn character(in: []const u8, pos: *usize) bool {
     // if (terminal_string("nul", in, &p)) ...
     // if (terminal_string("alarm", in, &p)) ...
     inline for (CHARACTER_NAMES) |name| {
-        if (U.str(name, in, &p)) {
+        if (U.str(name, in, &p) and term(in, p)) {
             pos.* = p;
             return true;
         }
+        p = pos.*;
     }
     // #\x
-    p += 1;
-    if (in[p - 1] == 'x') {
-        if (in[p..].len > 0 and hex_scalar_value(in, &p)) {
-            pos.* = p;
-            return true;
-        }
+    if (U.char('x', in, &p) and hex_scalar_value(in, &p) and term(in, p)) {
+        pos.* = p;
+        return true;
     }
 
     // the last case (#\{any_char}) becomes implicit
@@ -338,29 +336,29 @@ fn intraline_whitespace(in: []const u8, pos: *usize) bool {
     return U.str("\t", in, pos) or U.str(" ", in, pos);
 }
 
-fn string_element(in: []const u8, pos: *usize) bool {
-    if (in[pos.*] == '\"') return false;
+fn string_element(in: []const u8, p: *usize) bool {
+    if (U.char('\"', in, p)) return false;
 
     // check for some correct usages of '\'
-    if ((inline_hex_escape(in, pos) or
-        U.str("\\\t", in, pos) or // intraline_whitespace rule
-        U.str("\\ ", in, pos) or // intraline_whitespace rule
-        U.str("\\a", in, pos) or
-        U.str("\\b", in, pos) or
-        U.str("\\t", in, pos) or
-        U.str("\\n", in, pos) or
-        U.str("\\v", in, pos) or
-        U.str("\\f", in, pos) or
-        U.str("\\r", in, pos) or
-        U.str("\\\"", in, pos) or
-        U.str("\\\\", in, pos))) return true;
+    if ((inline_hex_escape(in, p) or
+        U.str("\\\t", in, p) or // intraline_whitespace rule
+        U.str("\\ ", in, p) or // intraline_whitespace rule
+        U.str("\\a", in, p) or
+        U.str("\\b", in, p) or
+        U.str("\\t", in, p) or
+        U.str("\\n", in, p) or
+        U.str("\\v", in, p) or
+        U.str("\\f", in, p) or
+        U.str("\\r", in, p) or
+        U.str("\\\"", in, p) or
+        U.str("\\\\", in, p))) return true;
 
-    if (in[pos.*] == '\\') return false;
+    if (in[p.*] == '\\') return false;
 
     // NOTE the gramar specifies some other internal rule
 
     // the char is some other char (valid), increment the cursor
-    pos.* += 1;
+    p.* += 1;
 
     return true;
 }
