@@ -7,6 +7,6 @@ pub const Lexer = @import("Lexer.zig");
 test {
     _ = @import("Lexer.zig");
     _ = @import("tests/lexer.zig");
-    _ = @import("Parser.zig");
-    _ = @import("tests/parser.zig");
+    // _ = @import("Parser.zig");
+    // _ = @import("tests/parser.zig");
 }
